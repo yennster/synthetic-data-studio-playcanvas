@@ -1,57 +1,68 @@
 # TODO
 
 > Actionable task list. Check items off as they land; add new ones at the right phase.
-> Keep in sync with [STATUS.md](STATUS.md). `[~]` = in progress.
+> Keep in sync with [STATUS.md](STATUS.md) and [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md).
+> `[~]` = in progress.
 
 ## Phase 0 — Foundation
 - [x] Vite + React + TS scaffold, deps (`playcanvas@2.21.4`, `zustand`, `jszip`, `vitest`)
-- [~] Feature map of original synthetic-data-studio → docs/ORIGINAL-FEATURES.md
-- [ ] docs/FEATURE-PARITY.md matrix (original feature → status in this repo)
-- [ ] LICENSE (Apache-2.0), README, package.json metadata (author yennster / Jenny Speelman)
-- [ ] Create private GitHub repo `yennster/synthetic-data-studio-playcanvas`, push initial commit
+- [x] Feature map of original synthetic-data-studio → docs/ORIGINAL-FEATURES.md
+- [x] docs/FEATURE-PARITY.md matrix + docs/ARCHITECTURE.md
+- [x] LICENSE (Apache-2.0), README, package.json metadata (author Jenny Speelman)
+- [x] Private GitHub repo `yennster/synthetic-data-studio-playcanvas`, pushed
+- [x] CI: GitHub Actions tsc + vitest + build
 
 ## Phase 1 — Engine core
-- [ ] `src/engine/createApp.ts`: AppBase bootstrap (GSplatComponentSystem, handlers, fill window, resize)
-- [ ] Scene manager: ground, lighting, environment/backdrop system, theme-aware clear color
-- [ ] Camera rig: orbit controls (CameraControls script), virtual capture camera separate from view camera
-- [ ] Entity/selection framework: pick, drag-move, transform gizmo equivalents
+- [x] `src/engine/createApp.ts`: AppBase bootstrap (GSplat systems, handlers, fill window)
+- [x] Scene environment: ground + two-light rig, theme-aware colors
+- [x] View camera with CameraControls orbit/pan/zoom
+- [ ] Entity selection: click-select, multi-select, drag-move, keyboard shortcuts (original parity)
+- [ ] Capture-camera gizmo (frustum visual on a gizmo-only layer) + orbit-center marker
 
 ## Phase 2 — Gaussian splats (new headline feature)
-- [ ] Import: drag&drop + file picker for .ply/.compressed.ply/.sog/.spz → gsplat asset → entity
-- [ ] Splat library card: list imported splats, use as **backdrop/environment** or as **object**
-- [ ] Create: mesh→splat converter (sample GLB surfaces → GSplatContainer)
-- [ ] Create: image→splat plane, procedural primitives (box/sphere/plane clouds)
-- [ ] Edit: crop box, sphere-delete, paint tint (GSplatProcessor pipeline)
-- [ ] Export edited/created splats to .ply
-- [ ] Persist splat assets in IndexedDB (same UX as original's imported assets)
+- [x] Import: drag&drop + picker for .ply/.compressed.ply/.sog
+- [ ] Import: .spz (needs external SpzParser + zstd wasm from engine examples)
+- [x] Splat library card: roles (backdrop/object), labels, remove
+- [x] Create: mesh→splat converter (area-weighted sampling + texture colors)
+- [x] Create: procedural primitives (plane/box/sphere)
+- [ ] Create: image→splat plane (GSplatImage-style)
+- [x] Edit: GPU erase brush (right-drag), erase/crop box API, reset
+- [ ] Edit: apply edits destructively + export edited imported scans (needs GPU→CPU readback of streams)
+- [x] Export created splats to 3DGS .ply
+- [x] Persist splats + models in IndexedDB, restore on reload with transforms
+- [ ] Splat transform UI (position/rotation/scale controls per entry)
 
 ## Phase 3 — Capture & export pipeline
-- [ ] Offscreen render target capture at configurable resolution
-- [ ] Camera trajectory / randomization (orbit ranges, jitter, distance, height)
-- [ ] Domain randomization: lighting, backdrop, object placement, distractors
-- [ ] 2D bounding-box computation for labeled objects (project AABBs; match original's format)
-- [ ] ZIP export (images + Edge Impulse-compatible labels layout — confirm exact format from feature map)
-- [ ] Seeded RNG (port rng.ts semantics)
+- [x] Offscreen 2× SSAA render-target capture, hidden-tab safe
+- [x] Bounding boxes: view-proj AABB projection at output res (orig contract, unit-tested)
+- [x] Camera trajectories (ported, 154 tests) + random jitter + lighting/object randomization
+- [x] ZIP export in exact EI layout (bounding_boxes.labels sidecar; STORE-only writer)
+- [x] Realism pixel pass (ported: chromatic→jitter→vignette→grain, JPEG round-trip)
+- [x] Seeded RNG (mulberry32, ?seed=)
+- [~] Vision capture UI cards (agent in flight)
 
 ## Phase 4 — Edge Impulse
-- [ ] API-key auth card + project list (port edgeImpulse.ts contract)
-- [ ] Ingestion upload: images w/ bounding-box structured labels; category split; progress UI
-- [ ] IMU/time-series upload payloads
-- [ ] In-browser inference on EI models + overlay (port eiModel.ts approach)
+- [x] Full EI client ported (ingestion + Studio API + sidecars, 65 tests)
+- [x] WASM model loader ported (eiModel.ts, all Emscripten quirks)
+- [~] Auth card / upload card / inference card + overlay (agent in flight)
+- [ ] Verify a real end-to-end upload against a live EI project (needs API key — user)
 
-## Phase 5 — Modes (parity with original)
-- [ ] Object detection mode
-- [ ] Visual anomaly mode
-- [ ] Motion / IMU mode (procedural motions + IMU noise model)
-- [ ] Rover mode (drive sim, lidar/ToF ring, obstacle scenes)
-- [ ] Arm mode (Braccio kinematics, IK, trajectories, pickup outcomes, POV camera)
-- [ ] Hand tracking (MediaPipe) — decide priority after feature map
-- [ ] Realism pipeline (diffusion img2img api route) — port api/realism-diffusion.ts
+## Phase 5 — Modes
+- [~] Object detection + visual anomaly modes (vision panel agent in flight)
+- [~] Motion mode: analytic IMU synthesis + panel (agent in flight; MuJoCo parity marked 🔀)
+- [~] Rover: kinematic sim + lidar (ray-AABB) + panel + rig (agents in flight)
+- [~] Arm: Braccio playback via ported IK/trajectories + rig (agents in flight)
+- [ ] Robot POV image capture wiring (runner captureImage → POV camera through CaptureRig)
+- [ ] Physics: real dynamics (Ammo/Rapier), conveyor belt, drop/settle behaviors
+- [ ] Hand tracking (MediaPipe) for motion mode
+- [ ] Realism diffusion mode endpoint (api/realism-diffusion port — hidden mode, low priority)
 
 ## Phase 6 — Platform
-- [ ] USDZ/GLB import (GLB native via ContainerHandler; USDZ needs wasm — check headers)
-- [ ] URL params + presets (port surface from docs/url-parameters.md)
-- [ ] Iframe embed support
-- [ ] Theme toggle (light/dark)
-- [ ] Tests: port applicable unit tests, add splat-specific ones
-- [ ] CI (GitHub Actions test workflow)
+- [ ] USDZ import (needle-tools OpenUSD wasm + COOP/COEP headers) — GLB works today
+- [x] URL params parsed (ported, full surface) + applyUrlPresets subset
+- [ ] applyUrlPresets: onlyMode filtering, autoUpload, armPose, gizmos flag behaviors
+- [x] Theme toggle (dark/light) with engine sync
+- [x] Persistence (localStorage v1 + IndexedDB assets)
+- [ ] Iframe embed height messaging (initPostContentHeight port); embed docs
+- [ ] Custom floor/skybox textures + env presets (studio/warehouse/whitebox/outdoor)
+- [ ] Deploy (Vercel) + og-card + screenshots
