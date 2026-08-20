@@ -106,10 +106,16 @@ export class ObjectManager {
     m.obj = obj;
   }
 
-  /** Per-label capture targets (one AABB per object). */
-  getLabelTargets(): LabelTarget[] {
+  /**
+   * Per-label capture targets (one AABB per object), filtered by owner:
+   * 'vision' matches untagged objects; 'rover'/'arm' match robot-owned.
+   * Without a scope every object is included.
+   */
+  getLabelTargets(scope?: 'vision' | 'rover' | 'arm'): LabelTarget[] {
     const targets: LabelTarget[] = [];
     for (const m of this.managed.values()) {
+      if (scope === 'vision' && m.obj.owner != null) continue;
+      if ((scope === 'rover' || scope === 'arm') && m.obj.owner !== scope) continue;
       const aabb = new BoundingBox();
       let first = true;
       for (const render of m.entity.findComponents('render') as any[]) {

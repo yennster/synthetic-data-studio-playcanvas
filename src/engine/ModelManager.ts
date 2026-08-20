@@ -133,6 +133,16 @@ export class ModelManager {
     }
   }
 
+  /** Shows/hides a model (e.g. hidden behind its splat conversion). Emits
+   * so persistence snapshots capture the visibility change. */
+  setEnabled(id: string, enabled: boolean): void {
+    const entry = this.entries.find((e) => e.id === id);
+    if (entry) {
+      entry.entity.enabled = enabled;
+      this.emit();
+    }
+  }
+
   remove(id: string): void {
     const index = this.entries.findIndex((e) => e.id === id);
     if (index >= 0) {

@@ -86,29 +86,29 @@ describe('generateMotionTrace — sampling contract', () => {
 describe('generateMotionTrace — drop', () => {
   const trace = generateMotionTrace('drop', settings(), mulberry32(42));
 
+  // Accelerometer convention: SPECIFIC FORCE (f = a − g), matching real
+  // IMUs and MuJoCo — |f| ≈ g when held/at rest, ≈ 0 in free fall.
   it('starts with a still held baseline (pre-release ≥ 40 ms)', () => {
     // randomPreReleaseMs guarantees ≥ 40 ms of hold; at 100 Hz the first
-    // four samples (t = 0..30 ms) are always inside it.
+    // four samples (t = 0..30 ms) are always inside it. A held IMU reads
+    // +1 g on the up axis.
     for (const s of trace.slice(0, 4)) {
-      expect(accMag(s)).toBeLessThan(0.5);
+      expect(accMag(s)).toBeCloseTo(G, 1);
       expect(gyrMag(s)).toBeLessThan(1e-9);
     }
   });
 
-  it('shows ~1 g free-fall (gravity rotated through the tumble)', () => {
-    // h = 1.5 m → ~0.55 s of flight → ≥ ~50 samples reading |a| ≈ g.
-    const [start, end] = longestRunNear(trace, G, 0.3);
+  it('shows ~0 g free-fall (specific force vanishes in flight)', () => {
+    // h = 1.5 m → ~0.55 s of flight → ≥ ~40 samples reading |f| ≈ 0.
+    const [start, end] = longestRunNear(trace, 0, 0.3);
     expect(end - start).toBeGreaterThanOrEqual(40);
-    // The tumbling orientation sweeps gravity across axes: no single
-    // axis holds the full −g for the whole flight, but the magnitude
-    // stays pinned at g.
     for (let i = start; i < end; i++) {
-      expect(accMag(trace[i])).toBeCloseTo(G, 1);
+      expect(accMag(trace[i])).toBeLessThan(0.3);
     }
   });
 
   it('tumbles during flight: constant gyro magnitude ≤ 3·√3 rad/s', () => {
-    const [start, end] = longestRunNear(trace, G, 0.3);
+    const [start, end] = longestRunNear(trace, 0, 0.3);
     const w0 = gyrMag(trace[start]);
     expect(w0).toBeGreaterThan(0.1);
     expect(w0).toBeLessThanOrEqual(3 * Math.sqrt(3) + 1e-9);
@@ -118,14 +118,14 @@ describe('generateMotionTrace — drop', () => {
   });
 
   it('ends the fall with an impact spike then settles', () => {
-    const [fallStart, fallEnd] = longestRunNear(trace, G, 0.3);
+    const [fallStart, fallEnd] = longestRunNear(trace, 0, 0.3);
     const peak = Math.max(...trace.map(accMag));
     const peakIdx = trace.findIndex((s) => accMag(s) === peak);
     expect(peak).toBeGreaterThan(3 * G);
     expect(peakIdx).toBeGreaterThanOrEqual(fallStart);
-    // After the spike + ringing the body is at rest again.
+    // After the spike + ringing the body rests again at +1 g.
     const tail = trace.slice(-5);
-    for (const s of tail) expect(accMag(s)).toBeLessThan(1.5);
+    for (const s of tail) expect(Math.abs(accMag(s) - G)).toBeLessThan(1.5);
     expect(fallEnd).toBeGreaterThan(fallStart);
   });
 });

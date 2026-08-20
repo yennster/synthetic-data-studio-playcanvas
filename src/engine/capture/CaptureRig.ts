@@ -39,7 +39,9 @@ export class CaptureRig {
   private rtWidth = 0;
   private rtHeight = 0;
   private canvas2d: HTMLCanvasElement | null = null;
-  private capturing = false;
+  /** Informational: true while a capture renders (callers are queued). */
+  capturing = false;
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(app: AppBase) {
     this.app = app;
@@ -116,15 +118,38 @@ export class CaptureRig {
    * Renders one frame from the capture camera at `width`x`height` (output
    * resolution; internally supersampled), computes bounding boxes for the
    * given label targets at output resolution, and returns a PNG blob.
+   *
+   * Concurrent callers are serialized on an internal queue — batch runs,
+   * robot POV captures, and the live-inference loop all share this rig,
+   * and a throw here used to silently drop dataset images.
+   *
+   * Pass `pose` to capture from a specific camera pose: it is applied
+   * after any queued capture finishes, so the frame can't render with a
+   * pose another caller set while this one waited.
    */
-  async captureFrame(
+  captureFrame(
     width: number,
     height: number,
-    targets: LabelTarget[]
+    targets: LabelTarget[],
+    pose?: { position: Vec3; target: Vec3; fov: number }
   ): Promise<CaptureResult> {
-    if (this.capturing) throw new Error('capture already in progress');
+    const run = this.queue.then(() => this.doCapture(width, height, targets, pose));
+    this.queue = run.catch(() => {});
+    return run;
+  }
+
+  private async doCapture(
+    width: number,
+    height: number,
+    targets: LabelTarget[],
+    pose?: { position: Vec3; target: Vec3; fov: number }
+  ): Promise<CaptureResult> {
     this.capturing = true;
     try {
+      if (pose) {
+        this.setPose(pose.position, pose.target);
+        this.setFov(pose.fov);
+      }
       this.ensureTarget(width, height);
       this.cameraEntity.enabled = true;
 

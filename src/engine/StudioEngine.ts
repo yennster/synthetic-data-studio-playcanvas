@@ -132,12 +132,10 @@ export class StudioEngine {
         this.pickerDirty = false;
       }
       this.picker.getWorldPointAsync(x, y).then((worldPoint: Vec3 | null) => {
-        if (worldPoint && this.eraseTarget) {
-          this.splatEditor.eraseSphere(
-            this.eraseTarget.entity,
-            worldPoint,
-            this.eraseTarget.radius
-          );
+        const current = this.eraseTarget;
+        // The entity may have been removed while the async pick resolved.
+        if (worldPoint && current && current.entity.gsplat) {
+          this.splatEditor.eraseSphere(current.entity, worldPoint, current.radius);
         }
       });
     };
@@ -199,12 +197,15 @@ export class StudioEngine {
 
   /**
    * Collects the labelled capture targets for bounding-box computation:
-   * spawned primitives, imported models (one box across all mesh
-   * instances), and splats with role 'object' (resource AABB transformed
-   * to world space).
+   * spawned primitives (owner-filtered by `scope` — robot-owned obstacles
+   * must not leak into vision captures and vice versa), imported models
+   * (one box across all mesh instances), and splats with role 'object'
+   * (resource AABB transformed to world space). Models and splats have no
+   * owner tag yet, so they participate in vision captures only.
    */
-  getLabelTargets(): LabelTarget[] {
-    const targets: LabelTarget[] = [...this.objects.getLabelTargets()];
+  getLabelTargets(scope: 'vision' | 'rover' | 'arm' = 'vision'): LabelTarget[] {
+    const targets: LabelTarget[] = [...this.objects.getLabelTargets(scope)];
+    if (scope !== 'vision') return targets;
     for (const model of this.models.entries) {
       if (!model.entity.enabled) continue;
       const aabb = computeWorldBounds(model.entity);

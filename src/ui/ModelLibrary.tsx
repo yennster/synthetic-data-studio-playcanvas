@@ -43,8 +43,9 @@ export function ModelLibrary() {
       setBusy(`Converting ${entry.name} to splats…`);
       try {
         engine.splats.createFromMesh(entry.entity, entry.name);
-        // Hide the mesh original so the splat version takes its place.
-        entry.entity.enabled = false;
+        // Hide the mesh original so the splat version takes its place —
+        // via the manager so persistence snapshots record the change.
+        engine.models.setEnabled(entry.id, false);
       } catch (err) {
         setError((err as Error).message);
       } finally {

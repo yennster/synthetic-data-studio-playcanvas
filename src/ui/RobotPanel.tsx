@@ -395,15 +395,17 @@ export function RobotPanel() {
       if (!anchors) return null;
       const s = useStore.getState();
       try {
-        engine.capture.setPose(
-          anchors.mount.getPosition(),
-          anchors.look.getPosition()
-        );
-        engine.capture.setFov(POV_FOV);
+        // Pose travels WITH the capture request so a queued vision capture
+        // or inference tick can't repose the shared rig underneath us.
         const frame = await engine.capture.captureFrame(
           s.robot.objectDetectionWidth,
           s.robot.objectDetectionHeight,
-          engine.getLabelTargets()
+          engine.getLabelTargets(s.robot.kind),
+          {
+            position: anchors.mount.getPosition().clone(),
+            target: anchors.look.getPosition().clone(),
+            fov: POV_FOV,
+          }
         );
         // Pixel-level pass only — boxes stay valid.
         const blob = await applyRealismToBlob(frame.blob, {
@@ -527,9 +529,11 @@ export function RobotPanel() {
   ]);
 
   const onResetScene = useCallback(() => {
-    const kind = useStore.getState().robot.kind;
+    const state = useStore.getState();
+    const kind = state.robot.kind;
     clearObjects(kind);
     clearRobotSamples();
+    state.resetRobotCaptures();
     if (kind === 'arm') setArmHomePose([...BRACCIO_REST_RAD]);
     roverRigRef.current?.setPose(0, 0, 0);
     roverRigRef.current?.setContact(false);

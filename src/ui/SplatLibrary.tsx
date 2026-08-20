@@ -25,6 +25,13 @@ export function SplatLibrary() {
     return () => engine.setEraseMode(null);
   }, [engine, erasingId, brushRadius]);
 
+  // Drop the brush if its target splat is removed.
+  useEffect(() => {
+    if (erasingId && !splats.some((s) => s.id === erasingId)) {
+      setErasingId(null);
+    }
+  }, [splats, erasingId]);
+
   const importFiles = useCallback(
     async (files: FileList | File[]) => {
       if (!engine) return;

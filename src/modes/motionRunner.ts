@@ -406,7 +406,16 @@ export function generateMotionTrace(
     const t = k * dtS;
     const state =
       plan.kind === 'shake' ? evalShake(plan, t) : evalRelease(plan, t);
-    const accBody = rotateIntoBody(state.q, state.accelWorld);
+    // Accelerometers measure SPECIFIC FORCE f = a − g, not coordinate
+    // acceleration: +9.81 on the up axis at rest, ~0 in free fall (this
+    // matches MuJoCo's accelerometer sensor and real LSM6DSO output —
+    // models trained on the inverted convention would not transfer).
+    const specificForceWorld: V3 = [
+      state.accelWorld[0],
+      state.accelWorld[1] + G,
+      state.accelWorld[2],
+    ];
+    const accBody = rotateIntoBody(state.q, specificForceWorld);
     const gyrBody = rotateIntoBody(state.q, state.omegaWorld);
     const { accel, gyro } = applyImuNoise(
       accBody,
@@ -454,6 +463,8 @@ export function createIdleSampler(
       accel[i] = TREMOR_ACC * s;
       gyro[i] = TREMOR_GYR * s;
     }
+    // Specific force: a held-still IMU reads +1 g on the up axis.
+    accel[1] += 9.81;
     return applyImuNoise(accel, gyro, state, cfg, dtSec, rng);
   };
 }

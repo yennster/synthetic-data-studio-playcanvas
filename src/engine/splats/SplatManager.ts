@@ -30,6 +30,8 @@ export interface SplatEntry {
   splatCount: number;
   /** Present for in-app-created splats; enables .ply export. */
   points?: SplatPoint[];
+  /** Present for imported splats; unloaded on remove. */
+  asset?: Asset;
 }
 
 export const SPLAT_EXTENSIONS = ['.ply', '.compressed.ply', '.sog'];
@@ -145,6 +147,7 @@ export class SplatManager {
               source,
               label: defaultLabel(name),
               splatCount: resource?.numSplats ?? 0,
+              asset,
             },
             persistedId
           )
@@ -229,6 +232,10 @@ export class SplatManager {
     if (index >= 0) {
       const [entry] = this.entries.splice(index, 1);
       entry.entity.destroy();
+      if (entry.asset) {
+        this.app.assets.remove(entry.asset);
+        entry.asset.unload();
+      }
       void deleteAssetBlob(SPLAT_STORE, entry.id).catch(() => {});
       this.emit();
     }
@@ -239,7 +246,13 @@ export class SplatManager {
   }
 
   destroy(): void {
-    for (const entry of this.entries) entry.entity.destroy();
+    for (const entry of this.entries) {
+      entry.entity.destroy();
+      if (entry.asset) {
+        this.app.assets.remove(entry.asset);
+        entry.asset.unload();
+      }
+    }
     this.entries = [];
     this.listeners.clear();
   }

@@ -32,6 +32,12 @@ export function Sidebar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
   const status = useStore((s) => s.status);
+  // A running batch (robot/procedural/recording) must finish or be
+  // stopped before switching modes — its panel owns the cancel flag, and
+  // unmounting it would orphan the run.
+  const runLocked = useStore(
+    (s) => s.robotRunning || s.dropsRunning || s.isRecording
+  );
 
   return (
     <aside className="sidebar">
@@ -52,7 +58,8 @@ export function Sidebar() {
             <button
               key={m.value}
               className={mode === m.value ? 'primary' : ''}
-              title={m.hint}
+              title={runLocked && m.value !== mode ? 'Stop the running batch first' : m.hint}
+              disabled={runLocked && m.value !== mode}
               onClick={() => setMode(m.value)}
             >
               {m.label}

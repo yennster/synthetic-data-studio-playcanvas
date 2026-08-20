@@ -57,8 +57,10 @@ export function useCaptureCameraSync(): void {
   const height = useStore((s) => s.capture.height);
 
   useEffect(() => {
+    // `mode` is a dep so returning from robot mode (whose POV drive moved
+    // the preview camera) restores the vision pose and FOV.
     engine?.setCaptureCameraPose(camPos, camTarget, fov);
-  }, [engine, camPos, camTarget, fov]);
+  }, [engine, mode, camPos, camTarget, fov]);
 
   useEffect(() => {
     engine?.environment.setLightIntensity(lightIntensity);

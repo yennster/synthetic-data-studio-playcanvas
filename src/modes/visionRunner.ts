@@ -7,6 +7,7 @@
  * original app's contract exactly (see docs/ORIGINAL-FEATURES.md).
  */
 
+import { Vec3 } from 'playcanvas';
 import type { StudioEngine } from '../engine/StudioEngine';
 import { useStore } from '../store/useStore';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
@@ -75,17 +76,25 @@ function applyLighting(engine: StudioEngine, base: BaseSnapshot): number {
   return intensity;
 }
 
-function randomizeObjectPositions(): void {
+/**
+ * Jitters object positions around their BASE (batch-start) placement.
+ * Reading current positions instead would compound the jitter every
+ * iteration and random-walk objects out of frame by the end of a batch.
+ */
+function randomizeObjectPositions(
+  baseObjects: { id: string; position: [number, number, number]; rotation: number }[]
+): void {
   const s = useStore.getState();
   if (!s.capture.randomizeObjects) return;
   const rng = getRng();
-  for (const obj of s.sceneObjects) {
-    if (obj.owner) continue;
-    s.updateObject(obj.id, {
+  for (const base of baseObjects) {
+    const obj = s.sceneObjects.find((o) => o.id === base.id);
+    if (!obj || obj.owner) continue;
+    s.updateObject(base.id, {
       position: [
-        obj.position[0] + (rng() - 0.5) * 0.6,
-        Math.max(0.2, obj.position[1] + (rng() - 0.5) * 0.2),
-        obj.position[2] + (rng() - 0.5) * 0.6,
+        base.position[0] + (rng() - 0.5) * 0.6,
+        Math.max(0.2, base.position[1] + (rng() - 0.5) * 0.2),
+        base.position[2] + (rng() - 0.5) * 0.6,
       ],
       rotation: rng() * Math.PI * 2,
     });
@@ -112,16 +121,28 @@ function currentAssetSnapshot(): { name: string; label: string }[] | undefined {
 
 async function captureOne(
   engine: StudioEngine,
-  filenamePrefix: string
+  filenamePrefix: string,
+  pose: {
+    pos: [number, number, number];
+    target: [number, number, number];
+    fov: number;
+  }
 ): Promise<Capture> {
   const s = useStore.getState();
   const { width, height } = s.capture;
   const anomaly = s.mode === 'anomaly';
 
+  // Pose rides along with the capture request — the rig is shared with
+  // the live-inference loop, which must not repose it mid-queue.
   const result = await engine.capture.captureFrame(
     width,
     height,
-    engine.getLabelTargets()
+    engine.getLabelTargets('vision'),
+    {
+      position: new Vec3(pose.pos[0], pose.pos[1], pose.pos[2]),
+      target: new Vec3(pose.target[0], pose.target[1], pose.target[2]),
+      fov: pose.fov,
+    }
   );
   const realismBlob = await applyRealismToBlob(result.blob, {
     mode: s.realism.mode,
@@ -161,7 +182,11 @@ export async function captureSingle(engine: StudioEngine): Promise<Capture> {
 
   const anomaly = s.mode === 'anomaly';
   const prefix = anomaly ? s.anomalyLabel || 'sample' : 'frame';
-  const capture = await captureOne(engine, prefix);
+  const capture = await captureOne(engine, prefix, {
+    pos: s.capture.camPos,
+    target: s.capture.camTarget,
+    fov: s.capture.fov,
+  });
   s.addCapture(capture);
 
   if (anomaly) {
@@ -215,11 +240,11 @@ export async function runBatch(
     for (let i = 0; i < total; i++) {
       if (isCancelled?.()) break;
       const pose = poseForIteration(base, i, total);
+      // Preview camera follows so the PiP shows the shot being framed.
       engine.setCaptureCameraPose(pose.pos, pose.target, pose.fov);
       applyLighting(engine, base);
-      randomizeObjectPositions();
-      // Let the object sync settle for one frame before shooting.
-      const capture = await captureOne(engine, prefix);
+      randomizeObjectPositions(baseObjects);
+      const capture = await captureOne(engine, prefix, pose);
       useStore.getState().addCapture(capture);
       captured.push(capture);
       onProgress?.({ done: i + 1, total });

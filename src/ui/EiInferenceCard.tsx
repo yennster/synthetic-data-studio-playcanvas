@@ -159,16 +159,27 @@ export function EiInferenceCard({
       const info = model.loaded.info;
       let blob: Blob;
       try {
-        // Render offscreen at the model's input dims. The rig throws
-        // when another capture (e.g. a batch run) is in flight — just
-        // skip this tick rather than fighting over the render target.
-        const cap = await engine.capture.captureFrame(
-          info.inputWidth,
-          info.inputHeight,
-          []
-        );
+        // Classify what the PREVIEW camera sees: in vision modes that is
+        // the virtual camera; in robot mode RobotPanel drives it along
+        // the POV mount, so inference follows the robot's eye. Capture at
+        // the preview's aspect — canvasToFeatures squashes to model dims,
+        // matching the original's preview→features semantics (and the
+        // overlay's coordinate mapping back onto the PiP).
+        const s = useStore.getState();
+        const isRobot = s.mode === 'robot';
+        const capW = isRobot ? s.robot.objectDetectionWidth : s.capture.width;
+        const capH = isRobot ? s.robot.objectDetectionHeight : s.capture.height;
+        const prevCam = engine.previewCamera;
+        const pos = prevCam.getPosition().clone();
+        const target = pos.clone().add(prevCam.forward);
+        const cap = await engine.capture.captureFrame(capW, capH, [], {
+          position: pos,
+          target,
+          fov: prevCam.camera!.fov,
+        });
         blob = cap.blob;
       } catch {
+        // Capture unavailable (engine tearing down) — skip this tick.
         return;
       }
       const bitmap = await createImageBitmap(blob);

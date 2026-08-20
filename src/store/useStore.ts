@@ -220,6 +220,8 @@ export interface PendingAsset {
   position: [number, number, number];
   eulerAngles: [number, number, number];
   scale: [number, number, number];
+  /** false when hidden (e.g. a mesh replaced by its splat conversion). */
+  enabled?: boolean;
 }
 
 interface StudioState {
@@ -309,6 +311,7 @@ interface StudioState {
   setRobot(patch: Partial<RobotSettings>): void;
   setRobotRunning(running: boolean): void;
   bumpRobotCaptures(): void;
+  resetRobotCaptures(): void;
   pushLidarSample(sample: LidarSample): void;
   pushRobotImuSample(sample: AccelSample): void;
   clearRobotSamples(): void;
@@ -448,6 +451,7 @@ export const useStore = create<StudioState>()(
       setRobot: (patch) => set((s) => ({ robot: { ...s.robot, ...patch } })),
       setRobotRunning: (robotRunning) => set({ robotRunning }),
       bumpRobotCaptures: () => set((s) => ({ robotCaptures: s.robotCaptures + 1 })),
+      resetRobotCaptures: () => set({ robotCaptures: 0 }),
       pushLidarSample: (sample) =>
         set((s) => ({ lidarSamples: [...s.lidarSamples, sample] })),
       pushRobotImuSample: (sample) =>
