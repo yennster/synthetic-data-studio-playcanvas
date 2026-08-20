@@ -290,3 +290,37 @@ input[type='password'] {
   font-size: 11px;
   margin-top: 8px;
 }
+
+.splat-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.splat-row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.splat-row-edit {
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.splat-row-edit label {
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.splat-row-edit .hint {
+  font-size: 10px;
+  color: var(--text-dim);
+}

@@ -2,6 +2,11 @@ import {
   BoundingBox,
   Color,
   Entity,
+  EVENT_MOUSEDOWN,
+  EVENT_MOUSEMOVE,
+  EVENT_MOUSEUP,
+  MOUSEBUTTON_RIGHT,
+  Picker,
   TONEMAP_ACES,
   Vec2,
   Vec3,
@@ -16,6 +21,7 @@ import { createSceneEnvironment, type SceneEnvironment } from './sceneEnvironmen
 import { ModelManager, computeWorldBounds } from './ModelManager';
 import { ObjectManager } from './ObjectManager';
 import { SplatManager } from './splats/SplatManager';
+import { SplatEditor } from './splats/SplatEditor';
 import { CaptureRig } from './capture/CaptureRig';
 import type { LabelTarget } from './capture/projectBoxes';
 
@@ -34,8 +40,13 @@ export class StudioEngine {
   models: ModelManager;
   objects: ObjectManager;
   capture: CaptureRig;
+  splatEditor: SplatEditor;
   /** In-canvas picture-in-picture preview of the capture camera. */
   previewCamera: Entity;
+  private eraseTarget: { entity: Entity; radius: number } | null = null;
+  private erasing = false;
+  private picker: Picker | null = null;
+  private pickerDirty = true;
   private cameraControls: any;
 
   private constructor(app: AppBase) {
@@ -49,6 +60,8 @@ export class StudioEngine {
     this.models = new ModelManager(app, this.content);
     this.objects = new ObjectManager(app, this.content);
     this.capture = new CaptureRig(app);
+    this.splatEditor = new SplatEditor(app);
+    this.setupEraseInput();
 
     this.previewCamera = new Entity('preview-camera', app);
     this.previewCamera.addComponent('camera', {
@@ -91,6 +104,57 @@ export class StudioEngine {
 
   setClearColor(color: Color): void {
     this.viewCamera.camera!.clearColor = color;
+  }
+
+  /**
+   * Splat erase brush: while active, right-drag erases splats of the target
+   * entity around the picked world point (LMB still orbits the camera).
+   */
+  setEraseMode(entity: Entity | null, radius = 0.15): void {
+    this.eraseTarget = entity ? { entity, radius } : null;
+    this.erasing = false;
+    if (entity) this.app.mouse?.disableContextMenu();
+  }
+
+  private setupEraseInput(): void {
+    const mouse = this.app.mouse;
+    if (!mouse) return;
+
+    const eraseAt = (x: number, y: number) => {
+      const target = this.eraseTarget;
+      if (!target) return;
+      if (!this.picker) this.picker = new Picker(this.app, 1, 1, true);
+      const canvas = this.app.graphicsDevice.canvas as HTMLCanvasElement;
+      if (this.pickerDirty) {
+        this.picker.resize(canvas.clientWidth, canvas.clientHeight);
+        const worldLayer = this.app.scene.layers.getLayerByName('World');
+        this.picker.prepare(this.viewCamera.camera!, this.app.scene, worldLayer ? [worldLayer] : undefined);
+        this.pickerDirty = false;
+      }
+      this.picker.getWorldPointAsync(x, y).then((worldPoint: Vec3 | null) => {
+        if (worldPoint && this.eraseTarget) {
+          this.splatEditor.eraseSphere(
+            this.eraseTarget.entity,
+            worldPoint,
+            this.eraseTarget.radius
+          );
+        }
+      });
+    };
+
+    mouse.on(EVENT_MOUSEDOWN, (e: { button: number; x: number; y: number }) => {
+      if (this.eraseTarget && e.button === MOUSEBUTTON_RIGHT) {
+        this.erasing = true;
+        this.pickerDirty = true;
+        eraseAt(e.x, e.y);
+      }
+    });
+    mouse.on(EVENT_MOUSEMOVE, (e: { x: number; y: number }) => {
+      if (this.erasing) eraseAt(e.x, e.y);
+    });
+    mouse.on(EVENT_MOUSEUP, (e: { button: number }) => {
+      if (e.button === MOUSEBUTTON_RIGHT) this.erasing = false;
+    });
   }
 
   /** Frames the view camera on a world-space point. */
@@ -161,6 +225,8 @@ export class StudioEngine {
   }
 
   destroy(): void {
+    this.picker?.destroy();
+    this.splatEditor.destroy();
     this.capture.destroy();
     this.objects.destroy();
     this.models.destroy();

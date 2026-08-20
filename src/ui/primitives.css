@@ -1,0 +1,401 @@
+/* ------------------------------------------------------------------ *
+ * Shared UI primitive styles (CollapsibleCard, ToggleSwitch,          *
+ * SliderRow, NumberField, RadioPills).                                *
+ *                                                                     *
+ * Namespaced `ui-` so panel-specific CSS can't collide. Built only    *
+ * from the design tokens in styles.css plus the #1b1f26 sunk-surface  *
+ * tone the global button/select rules already use. Accent-tinted      *
+ * fills use color-mix with an rgba fallback declared first (the       *
+ * fallback assumes the stock --accent #ff5c1a).                       *
+ * ------------------------------------------------------------------ */
+
+/* ============ CollapsibleCard ============ */
+
+/* The heading is an <h2> (picks up the `.card h2` look automatically)
+   wrapping the toggle <button>; the button inherits the h2 typography
+   and owns the full-width click target. */
+.ui-collapse-h {
+  margin: 0;
+}
+.card .ui-collapse-h {
+  /* `.card h2` adds margin-bottom: 10px; the body supplies its own
+     spacing so a collapsed card doesn't keep a dangling gap. */
+  margin-bottom: 0;
+}
+
+.ui-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 2px 0;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 120ms;
+}
+.ui-collapse-toggle:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+}
+.ui-collapse-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ui-collapse-heading {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Accent badge — only rendered while collapsed. */
+.ui-collapse-badge {
+  flex: none;
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: var(--accent);
+}
+
+.ui-collapse-chevron {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+  transform: rotate(0deg);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), color 120ms;
+}
+.ui-collapse-chevron.open {
+  transform: rotate(90deg);
+}
+/* Badge already claimed the trailing space; chevron just trails it. */
+.ui-collapse-badge + .ui-collapse-chevron {
+  margin-left: 0;
+}
+.ui-collapse-toggle:hover:not(:disabled) .ui-collapse-chevron {
+  color: var(--accent);
+}
+
+.ui-collapse-body {
+  margin-top: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-collapse-chevron,
+  .ui-switch-thumb {
+    transition: none;
+  }
+}
+
+/* ============ ToggleSwitch ============ */
+
+.ui-switch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.ui-switch-row.disabled {
+  opacity: 0.55;
+}
+/* The row already carries the dimming; don't double-fade the button
+   via the global `button:disabled { opacity: 0.5 }` rule. */
+.ui-switch-row.disabled .ui-switch {
+  opacity: 1;
+}
+
+.ui-switch-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ui-switch-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ui-switch-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+/* `titleAs="h3"` — section-header weight, matching `.card h2`. */
+.ui-switch-title.as-h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+
+.ui-switch-state {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.ui-switch-state.on {
+  color: var(--accent);
+  border-color: rgba(255, 92, 26, 0.45);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.ui-switch-help {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* iOS-style affordance for a binary control; ON is an accent fill. */
+.ui-switch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  width: 30px;
+  height: 16px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: #1b1f26;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+.ui-switch:hover:not(:disabled) {
+  background: #232833;
+  border-color: var(--panel-border);
+}
+.ui-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ui-switch.on {
+  border-color: var(--accent);
+  background: rgba(255, 92, 26, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.ui-switch.on:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgba(255, 92, 26, 0.24);
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.ui-switch:disabled {
+  cursor: default;
+}
+.ui-switch-thumb {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--text-dim);
+  transform: translateX(0);
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), background 160ms;
+}
+.ui-switch.on .ui-switch-thumb {
+  background: var(--accent);
+  /* inner width 24px (30 − 2 border − 4 padding) − 10px thumb */
+  transform: translateX(14px);
+}
+
+/* ============ Field rows (SliderRow, labeled NumberField) ============ */
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-dim);
+}
+.ui-field.disabled {
+  opacity: 0.55;
+}
+.ui-field-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.ui-field-value {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* ============ Range input (SliderRow) ============ */
+
+.ui-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.ui-range:disabled {
+  cursor: default;
+}
+.ui-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.ui-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--panel-border);
+}
+.ui-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  transition: transform 100ms;
+}
+.ui-range:hover:not(:disabled)::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.ui-range:disabled::-webkit-slider-thumb {
+  background: var(--text-dim);
+}
+.ui-range::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--panel-border);
+}
+.ui-range::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.ui-range:disabled::-moz-range-thumb {
+  background: var(--text-dim);
+}
+
+/* ============ Number input (NumberField) ============ */
+
+.ui-number {
+  width: 100%;
+  padding: 5px 8px;
+  background: #1b1f26;
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 120ms;
+}
+.ui-number:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.ui-number:disabled {
+  opacity: 0.5;
+}
+.ui-number::placeholder {
+  color: var(--text-dim);
+}
+
+/* ============ RadioPills ============ */
+
+.ui-pills-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Sunk segmented rail; the active pill is the lone accent element. */
+.ui-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  background: #12151a;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+.ui-pills.grid {
+  display: grid;
+}
+
+.ui-pill {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.ui-pill:hover:not(:disabled) {
+  background: #232833;
+  border-color: transparent;
+  color: var(--text);
+}
+.ui-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ui-pill[aria-checked='true'] {
+  color: var(--accent);
+  background: rgba(255, 92, 26, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: rgba(255, 92, 26, 0.5);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.ui-pill[aria-checked='true']:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(255, 92, 26, 0.2);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.ui-pill-hint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}

@@ -1,7 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEngine } from '../engine/EngineContext';
 import { useStore } from '../store/useStore';
 import { isSplatFilename, SPLAT_EXTENSIONS } from '../engine/splats/SplatManager';
+import { pointsToPly } from '../engine/splats/splatExport';
+import { saveBlob } from '../lib/captureFormats';
 
 /**
  * Splat library card: import scans, create primitives, manage roles/labels.
@@ -12,6 +14,16 @@ export function SplatLibrary() {
   const setBusy = useStore((s) => s.setBusy);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [erasingId, setErasingId] = useState<string | null>(null);
+  const [brushRadius, setBrushRadius] = useState(0.15);
+
+  // Keep the engine's erase brush in step with the UI state.
+  useEffect(() => {
+    if (!engine) return;
+    const entry = erasingId ? engine.splats.get(erasingId) : undefined;
+    engine.setEraseMode(entry?.entity ?? null, brushRadius);
+    return () => engine.setEraseMode(null);
+  }, [engine, erasingId, brushRadius]);
 
   const importFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -85,22 +97,71 @@ export function SplatLibrary() {
       {error && <p className="error">{error}</p>}
       <ul className="asset-list">
         {splats.map((entry) => (
-          <li key={entry.id}>
-            <span className="asset-name" title={`${entry.splatCount} splats`}>
-              {entry.name}
-            </span>
-            <select
-              value={entry.role}
-              onChange={(e) =>
-                engine?.splats.setRole(entry.id, e.target.value as 'backdrop' | 'object')
-              }
-            >
-              <option value="backdrop">backdrop</option>
-              <option value="object">object</option>
-            </select>
-            <button className="icon" onClick={() => engine?.splats.remove(entry.id)}>
-              ✕
-            </button>
+          <li key={entry.id} className="splat-row">
+            <div className="splat-row-main">
+              <span className="asset-name" title={`${entry.splatCount} splats`}>
+                {entry.name}
+              </span>
+              <select
+                value={entry.role}
+                onChange={(e) =>
+                  engine?.splats.setRole(entry.id, e.target.value as 'backdrop' | 'object')
+                }
+              >
+                <option value="backdrop">backdrop</option>
+                <option value="object">object</option>
+              </select>
+              <button
+                className={`icon${erasingId === entry.id ? ' primary' : ''}`}
+                title="Erase brush: right-drag in the scene to erase splats"
+                onClick={() =>
+                  setErasingId(erasingId === entry.id ? null : entry.id)
+                }
+              >
+                ✏
+              </button>
+              {entry.points && (
+                <button
+                  className="icon"
+                  title="Export as .ply (3D Gaussian Splatting)"
+                  onClick={() =>
+                    saveBlob(
+                      pointsToPly(entry.points!),
+                      `${entry.name.replace(/\.(compressed\.)?(ply|sog)$/i, '') || 'splat'}.ply`
+                    )
+                  }
+                >
+                  ⤓
+                </button>
+              )}
+              <button className="icon" onClick={() => engine?.splats.remove(entry.id)}>
+                ✕
+              </button>
+            </div>
+            {erasingId === entry.id && (
+              <div className="splat-row-edit">
+                <label>
+                  Brush {brushRadius.toFixed(2)} m
+                  <input
+                    type="range"
+                    min={0.02}
+                    max={1}
+                    step={0.01}
+                    value={brushRadius}
+                    onChange={(e) => setBrushRadius(Number(e.target.value))}
+                  />
+                </label>
+                <button
+                  onClick={() => {
+                    const e = engine?.splats.get(entry.id);
+                    if (e) engine?.splatEditor.resetVisibility(e.entity);
+                  }}
+                >
+                  Reset edits
+                </button>
+                <p className="hint">Right-drag on the splat to erase. LMB orbits.</p>
+              </div>
+            )}
           </li>
         ))}
         {splats.length === 0 && <li className="empty">No splats yet</li>}

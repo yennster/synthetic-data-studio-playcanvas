@@ -26,6 +26,8 @@ export interface SplatEntry {
   /** Label used for bounding boxes when role is 'object'. */
   label: string;
   splatCount: number;
+  /** Present for in-app-created splats; enables .ply export. */
+  points?: SplatPoint[];
 }
 
 export const SPLAT_EXTENSIONS = ['.ply', '.compressed.ply', '.sog'];
@@ -175,6 +177,7 @@ export class SplatManager {
       source,
       label: defaultLabel(name),
       splatCount: points.length,
+      points,
     });
   }
 
