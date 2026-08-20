@@ -1,0 +1,159 @@
+/* ------------------------------------------------------------------ *
+ * Edge Impulse cards (EiAuthCard, EiUploadCard, EiInferenceCard).     *
+ * Namespaced `ei-` so panel CSS can't collide; built only from the    *
+ * design tokens in styles.css.                                        *
+ * ------------------------------------------------------------------ */
+
+.ei-form,
+.ei-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Labeled field rows — same micro-label look as the shared ui-field. */
+.ei-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ei-field-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ei-input {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.ei-input:focus,
+.ei-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ei-select {
+  width: 100%;
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
+/* Grouped sub-sections in the inference card (project vs file). */
+fieldset.ei-group {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ei-group legend {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0 4px;
+}
+
+.ei-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.ei-note strong {
+  color: var(--text);
+}
+
+.ei-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: var(--text);
+}
+
+.ei-project-name {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.ei-model-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ei-model-meta {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.ei-file-input {
+  font-size: 11px;
+  color: var(--text-dim);
+  max-width: 100%;
+}
+
+/* Inline status row (mirrored to the global status bar). */
+.ei-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.4;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--text-dim);
+  word-break: break-word;
+}
+
+.ei-status.busy {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.ei-status.ok {
+  border-color: var(--accent-2);
+  color: var(--text);
+}
+
+.ei-status.err {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.ei-spinner {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--panel-border);
+  border-top-color: var(--accent);
+  animation: ei-spin 700ms linear infinite;
+}
+
+@keyframes ei-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ei-spinner {
+    animation-duration: 2s;
+  }
+}
