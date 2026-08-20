@@ -222,8 +222,9 @@ describe('runRobotBatch (arm)', () => {
     expect(names[0]).toMatch(new RegExp(`^pick_place_1\\.${TS}\\.json$`));
     expect(names[1]).toBe(names[0].replace(/\.json$/, '.rosbag.jsonl'));
     expect(names[2]).toBe('info.labels');
+    // Zip stem counts recorded samples, not zip entries.
     expect(result.zip!.name).toMatch(
-      new RegExp(`^arm_pick_place_3\\.${TS}\\.zip$`),
+      new RegExp(`^arm_pick_place_1\\.${TS}\\.zip$`),
     );
 
     // The acquisition payload is a 6-channel IMU time-series.

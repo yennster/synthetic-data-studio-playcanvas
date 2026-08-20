@@ -726,10 +726,14 @@ export async function runRobotBatch(
       });
     }
     if (entries.length === 0) return;
+    // Zip stem counts recorded samples, not zip entries (info.labels and
+    // rosbag files would inflate the number) — matches the original's
+    // `rover_{event}_{n}` / `arm_{trajectory}_{n}` naming.
+    const sampleCount = result.sensorZipped + result.sensorUploaded;
     const stem =
       robot.kind === 'rover'
-        ? `rover_${robot.roverEvent}_${entries.length}`
-        : `arm_${robot.armTrajectory}_${entries.length}`;
+        ? `rover_${robot.roverEvent}_${sampleCount}`
+        : `arm_${robot.armTrajectory}_${sampleCount}`;
     const zipName = buildFileName(stem).replace(/\.json$/, '.zip');
     const blob = await assembleZip(entries);
     result.zip = {

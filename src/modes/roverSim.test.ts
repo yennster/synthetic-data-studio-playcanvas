@@ -249,8 +249,9 @@ describe('runRobotBatch (rover)', () => {
     expect(names[4]).toBe('info.labels');
     expect(names).toHaveLength(5);
 
-    // Zip name: rover_${event}_${entryCount}.<ts>.zip
-    expect(result.zip!.name).toMatch(new RegExp(`^rover_cruise_5\\.${TS}\\.zip$`));
+    // Zip name: rover_${event}_${sampleCount}.<ts>.zip — counts recorded
+    // samples, not zip entries (sidecars would inflate the number).
+    expect(result.zip!.name).toMatch(new RegExp(`^rover_cruise_2\\.${TS}\\.zip$`));
   });
 
   it('offline zip entries carry valid payloads and info.labels metadata', async () => {
