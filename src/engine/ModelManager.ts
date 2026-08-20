@@ -1,4 +1,5 @@
 import { Asset, BoundingBox, Entity, Vec3, type AppBase } from 'playcanvas';
+import { deleteAssetBlob, putAssetBlob, MODEL_STORE } from '../lib/assetStore';
 
 export type ModelSource =
   | { kind: 'file'; filename: string }
@@ -33,7 +34,6 @@ export class ModelManager {
   private app: AppBase;
   private parent: Entity;
   private listeners = new Set<Listener>();
-  private nextId = 1;
   entries: ModelEntry[] = [];
 
   constructor(app: AppBase, parent: Entity) {
@@ -51,7 +51,7 @@ export class ModelManager {
     for (const fn of this.listeners) fn(snapshot);
   }
 
-  async importFile(file: File): Promise<ModelEntry> {
+  async importFile(file: File, persistedId?: string): Promise<ModelEntry> {
     if (!isModelFilename(file.name)) {
       throw new Error(
         `Unsupported model format: ${file.name}. Supported: ${MODEL_EXTENSIONS.join(', ')}`
@@ -63,7 +63,18 @@ export class ModelManager {
         url,
         filename: file.name,
       });
-      return await this.loadAsset(asset, file.name, { kind: 'file', filename: file.name });
+      const entry = await this.loadAsset(
+        asset,
+        file.name,
+        { kind: 'file', filename: file.name },
+        persistedId
+      );
+      if (!persistedId) {
+        void putAssetBlob(MODEL_STORE, entry.id, file).catch((err) =>
+          console.warn('model blob persist failed', err)
+        );
+      }
+      return entry;
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -74,7 +85,12 @@ export class ModelManager {
     return this.loadAsset(asset, name, { kind: 'url', url });
   }
 
-  private loadAsset(asset: Asset, name: string, source: ModelSource): Promise<ModelEntry> {
+  private loadAsset(
+    asset: Asset,
+    name: string,
+    source: ModelSource,
+    persistedId?: string
+  ): Promise<ModelEntry> {
     return new Promise((resolve, reject) => {
       asset.on('load', () => {
         const resource = asset.resource as { instantiateRenderEntity(): Entity };
@@ -91,7 +107,7 @@ export class ModelManager {
         );
 
         const entry: ModelEntry = {
-          id: `model-${this.nextId++}`,
+          id: persistedId ?? crypto.randomUUID(),
           name,
           entity,
           asset,
@@ -124,6 +140,7 @@ export class ModelManager {
       entry.entity.destroy();
       this.app.assets.remove(entry.asset);
       entry.asset.unload();
+      void deleteAssetBlob(MODEL_STORE, entry.id).catch(() => {});
       this.emit();
     }
   }

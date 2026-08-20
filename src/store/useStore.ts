@@ -208,6 +208,20 @@ export interface StatusState {
   msg: string;
 }
 
+/** Reload-persisted asset metadata; blobs live in IndexedDB (assetStore). */
+export interface PendingAsset {
+  id: string;
+  name: string;
+  /** Filename with the extension the importer needs (e.g. scan.sog). */
+  filename: string;
+  label: string;
+  /** Splats only. */
+  role?: 'backdrop' | 'object';
+  position: [number, number, number];
+  eulerAngles: [number, number, number];
+  scale: [number, number, number];
+}
+
 interface StudioState {
   // Shell
   theme: Theme;
@@ -221,6 +235,9 @@ interface StudioState {
   // Asset mirrors (live objects owned by the engine managers)
   splats: SplatEntry[];
   models: ModelEntry[];
+  // Reload persistence metadata (blobs in IndexedDB)
+  pendingSplats: PendingAsset[];
+  pendingModels: PendingAsset[];
 
   // Scene
   sceneObjects: SceneObject[];
@@ -261,6 +278,8 @@ interface StudioState {
   setCardOpen(key: string, open: boolean): void;
   setSplats(entries: SplatEntry[]): void;
   setModels(entries: ModelEntry[]): void;
+  setPendingSplats(entries: PendingAsset[]): void;
+  setPendingModels(entries: PendingAsset[]): void;
 
   addObject(obj: Omit<SceneObject, 'id'>): string;
   updateObject(id: string, patch: Partial<SceneObject>): void;
@@ -331,6 +350,8 @@ export const useStore = create<StudioState>()(
 
       splats: [],
       models: [],
+      pendingSplats: [],
+      pendingModels: [],
 
       sceneObjects: [],
       selectedIds: [],
@@ -373,6 +394,8 @@ export const useStore = create<StudioState>()(
         set((s) => ({ cardOpen: { ...s.cardOpen, [key]: open } })),
       setSplats: (splats) => set({ splats }),
       setModels: (models) => set({ models }),
+      setPendingSplats: (pendingSplats) => set({ pendingSplats }),
+      setPendingModels: (pendingModels) => set({ pendingModels }),
 
       addObject: (obj) => {
         const id = crypto.randomUUID();
@@ -447,6 +470,8 @@ export const useStore = create<StudioState>()(
         imuNoise: s.imuNoise,
         drops: s.drops,
         robot: s.robot,
+        pendingSplats: s.pendingSplats,
+        pendingModels: s.pendingModels,
         // ei (API keys) deliberately NOT persisted.
       }),
     }

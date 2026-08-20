@@ -7,6 +7,8 @@ import {
   type SplatPoint,
 } from './splatCreate';
 import { meshEntityToSplatPoints, type MeshToSplatOptions } from './meshToSplat';
+import { pointsToPly } from './splatExport';
+import { deleteAssetBlob, putAssetBlob, SPLAT_STORE } from '../../lib/assetStore';
 
 /** How a splat participates in synthetic data generation. */
 export type SplatRole = 'backdrop' | 'object';
@@ -48,7 +50,6 @@ export class SplatManager {
   private app: AppBase;
   private parent: Entity;
   private listeners = new Set<Listener>();
-  private nextId = 1;
   entries: SplatEntry[] = [];
 
   constructor(app: AppBase, parent: Entity) {
@@ -66,16 +67,23 @@ export class SplatManager {
     for (const fn of this.listeners) fn(snapshot);
   }
 
-  private register(entry: Omit<SplatEntry, 'id'>): SplatEntry {
-    const full: SplatEntry = { ...entry, id: `splat-${this.nextId++}` };
+  private register(entry: Omit<SplatEntry, 'id'>, id?: string): SplatEntry {
+    const full: SplatEntry = { ...entry, id: id ?? crypto.randomUUID() };
     this.entries.push(full);
     this.parent.addChild(full.entity);
     this.emit();
     return full;
   }
 
-  /** Imports a splat file dropped or picked by the user. */
-  async importFile(file: File, role: SplatRole = 'backdrop'): Promise<SplatEntry> {
+  /**
+   * Imports a splat file dropped or picked by the user. `persistedId`
+   * is passed by rehydration to reuse the stored id (skips re-saving).
+   */
+  async importFile(
+    file: File,
+    role: SplatRole = 'backdrop',
+    persistedId?: string
+  ): Promise<SplatEntry> {
     if (!isSplatFilename(file.name)) {
       throw new Error(
         `Unsupported splat format: ${file.name}. Supported: ${SPLAT_EXTENSIONS.join(', ')}`
@@ -90,10 +98,19 @@ export class SplatManager {
       contents: new Response(file) as unknown as ArrayBuffer,
     });
     try {
-      return await this.loadAsset(asset, file.name, role, {
-        kind: 'file',
-        filename: file.name,
-      });
+      const entry = await this.loadAsset(
+        asset,
+        file.name,
+        role,
+        { kind: 'file', filename: file.name },
+        persistedId
+      );
+      if (!persistedId) {
+        void putAssetBlob(SPLAT_STORE, entry.id, file).catch((err) =>
+          console.warn('splat blob persist failed', err)
+        );
+      }
+      return entry;
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -109,7 +126,8 @@ export class SplatManager {
     asset: Asset,
     name: string,
     role: SplatRole,
-    source: SplatSource
+    source: SplatSource,
+    persistedId?: string
   ): Promise<SplatEntry> {
     return new Promise((resolve, reject) => {
       asset.on('load', () => {
@@ -119,14 +137,17 @@ export class SplatManager {
         entity.setLocalEulerAngles(0, 0, 180);
         const resource = asset.resource as { numSplats?: number } | null;
         resolve(
-          this.register({
-            name,
-            entity,
-            role,
-            source,
-            label: defaultLabel(name),
-            splatCount: resource?.numSplats ?? 0,
-          })
+          this.register(
+            {
+              name,
+              entity,
+              role,
+              source,
+              label: defaultLabel(name),
+              splatCount: resource?.numSplats ?? 0,
+            },
+            persistedId
+          )
         );
       });
       asset.on('error', (err: string) => reject(new Error(err)));
@@ -170,7 +191,7 @@ export class SplatManager {
   ): SplatEntry {
     const container = buildSplatContainer(this.app.graphicsDevice, points);
     const entity = splatEntityFromContainer(this.app, name, container);
-    return this.register({
+    const entry = this.register({
       name,
       entity,
       role,
@@ -179,6 +200,12 @@ export class SplatManager {
       splatCount: points.length,
       points,
     });
+    // Created splats persist as their PLY serialization so reloads
+    // rehydrate them through the normal import path.
+    void putAssetBlob(SPLAT_STORE, entry.id, pointsToPly(points)).catch((err) =>
+      console.warn('splat blob persist failed', err)
+    );
+    return entry;
   }
 
   setRole(id: string, role: SplatRole): void {
@@ -202,6 +229,7 @@ export class SplatManager {
     if (index >= 0) {
       const [entry] = this.entries.splice(index, 1);
       entry.entity.destroy();
+      void deleteAssetBlob(SPLAT_STORE, entry.id).catch(() => {});
       this.emit();
     }
   }

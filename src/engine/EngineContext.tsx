@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { StudioEngine } from './StudioEngine';
+import { rehydrateAssets, snapshotPendingAssets } from './rehydrateAssets';
 import { useStore } from '../store/useStore';
 
 const EngineContext = createContext<StudioEngine | null>(null);
@@ -40,8 +41,19 @@ export function EngineProvider({ children }: { children: ReactNode }) {
           return;
         }
         instance = created;
-        created.splats.onChange(setSplats);
-        created.models.onChange(useStore.getState().setModels);
+        created.splats.onChange((entries) => {
+          setSplats(entries);
+          snapshotPendingAssets(created);
+          // A splat backdrop replaces the procedural ground.
+          created.environment.setGroundVisible(
+            !entries.some((e) => e.role === 'backdrop')
+          );
+        });
+        created.models.onChange((entries) => {
+          useStore.getState().setModels(entries);
+          snapshotPendingAssets(created);
+        });
+        void rehydrateAssets(created);
         // Mirror store scene objects into engine entities.
         created.objects.sync(useStore.getState().sceneObjects);
         const unsubObjects = useStore.subscribe((state, prev) => {
