@@ -41,8 +41,12 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         }
         instance = created;
         created.splats.onChange(setSplats);
+        created.models.onChange(useStore.getState().setModels);
         setEngine(created);
         setEngineStatus('ready');
+        if (import.meta.env.DEV) {
+          (window as unknown as { __studio?: StudioEngine }).__studio = created;
+        }
       })
       .catch((err: Error) => {
         console.error('Engine boot failed', err);

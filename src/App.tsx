@@ -1,5 +1,6 @@
 import { EngineProvider } from './engine/EngineContext';
 import { SplatLibrary } from './ui/SplatLibrary';
+import { ModelLibrary } from './ui/ModelLibrary';
 import { useStore } from './store/useStore';
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
             <p className="tagline">PlayCanvas · Gaussian Splats · Edge Impulse</p>
           </header>
           <SplatLibrary />
+          <ModelLibrary />
         </aside>
         {engineStatus === 'booting' && <div className="status-pill">Starting engine…</div>}
         {engineStatus === 'error' && (
