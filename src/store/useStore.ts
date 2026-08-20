@@ -479,3 +479,9 @@ export const useStore = create<StudioState>()(
 );
 
 export type { BoundingBox };
+
+// Dev console handle — guarantees probes hit the page's live instance
+// even when HMR forks module URLs.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __useStore?: typeof useStore }).__useStore = useStore;
+}

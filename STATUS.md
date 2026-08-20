@@ -3,12 +3,11 @@
 > **Purpose of this file**: living snapshot of where the project is, so any agent (or human)
 > can pick up work without reading the whole git history. Update this file **every work session**:
 > bump the date, move items between sections, and keep "Next steps" honest.
-> Detailed task list lives in [TODO.md](TODO.md). Design rationale lives in
-> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The original app's behavior contract lives in
-> [docs/ORIGINAL-FEATURES.md](docs/ORIGINAL-FEATURES.md); parity tracking in
-> [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md).
+> Detailed task list: [TODO.md](TODO.md). Design rationale: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+> Original app's behavior contract: [docs/ORIGINAL-FEATURES.md](docs/ORIGINAL-FEATURES.md).
+> Parity tracking: [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md).
 
-**Last updated:** 2026-08-20 (session 1, mid-session)
+**Last updated:** 2026-08-20 (end of session 1)
 
 ## What this project is
 
@@ -17,72 +16,57 @@ A ground-up reimplementation of [yennster/synthetic-data-studio](https://github.
 creation/editing** for hyper-realistic synthetic data. Repo:
 `github.com/yennster/synthetic-data-studio-playcanvas` (private).
 
-- Engine: `playcanvas` **2.21.4** (npm), TypeScript, Vite, React 18 UI shell, zustand state.
-- Reference clone of the original lives in the session scratchpad; re-clone from GitHub if needed.
+- Engine: `playcanvas` **2.21.4** (npm), TypeScript, Vite, React, zustand.
+- `npm run dev` → http://localhost:5173. `npx vitest run` → 399 tests. `npx tsc -b` clean. CI on push.
 
-## Current state (done & verified)
+## Working today (all verified in-browser this session)
 
-- [x] Repo scaffolded, pushed to private GitHub repo (signed commits as Jenny Speelman)
-- [x] Engine bootstrap: AppBase + GSplat systems, fill-window canvas, CameraControls orbit view
-- [x] **Splat import**: .ply / .compressed.ply / .sog via drag-drop or picker (in-memory `Response`
-      contents; parser keyed by `asset.file.filename`); role = backdrop | object; label editing
-- [x] **In-app splat creation**: procedural primitives (plane/box/sphere point sampling) and
-      **mesh→splat conversion** (area-weighted triangle sampling w/ diffuse texture lookup) via
-      `GSplatFormat.createSimpleFormat` + `GSplatContainer` (verified rendering)
-- [x] GLB import (ModelManager) with ground-rest placement and labels
-- [x] **Capture pipeline** (verified live in browser): offscreen 2× SSAA render target, async
-      readback (`texture.read` immediate), vertical flip + high-quality downsample, PNG encode;
-      pure view-proj AABB→bbox projection (behind-camera skip, 4px min, clamp+round at output res);
-      works in hidden tabs via manual `app.tick` pumping
-- [x] **All pure libs ported from the original with their test suites — 335 tests green**:
-      edgeImpulse (full ingestion + Studio API + sidecars), eiModel (WASM classifier loader),
-      zip/zipReader/zipWorker, realism, imuNoise, proceduralMotion, urlParams/embed/cameraTrajectory,
-      braccio/braccioIk/armTrajectories/armPickup*/rover/lidar/rosMessages/handMath, rng/math
-- [x] Full zustand store with original state shape + defaults (persist v1; API keys never persisted)
-- [x] Vision runner: single + batch capture with trajectories/jitter/restore, realism pass,
-      zip packaging (PNG+bounding_boxes.labels), store bookkeeping (verified: 3-shot circle batch)
-- [x] App shell: mode switcher sidebar, HUD pills, dark/light theme, URL preset application
-      (`applyUrlPresets`), embed/minimal chrome flags
+**Gaussian splats (headline additions)**
+- Import `.ply` / `.compressed.ply` / `.sog` (drag-drop/picker); role = backdrop (hides
+  procedural ground) or labeled object (gets bounding boxes in captures)
+- Create in-app: procedural primitives + **mesh→splat conversion** (GLB → splats with texture colors)
+- Edit: GPU **erase brush** (right-drag), crop/erase box API, reset — works on imported scans
+- Export created splats to standard 3DGS `.ply` (round-trip verified)
+- Splats + models persist in IndexedDB and restore on reload with transforms
 
-## In flight (background agents, may land after this snapshot)
+**All four modes, end-to-end**
+- **Object detection**: scene objects/GLB/splat-objects → single capture (PNG+`bounding_boxes.labels`
+  zip) and batch (trajectories: circle/figure8/arc/spiral/orbit_dome, camera/light/object jitter,
+  base restore) — verified with pixel-correct boxes; PiP virtual-camera preview (bottom-right)
+- **Visual anomaly**: batch label, no boxes (shares VisionPanel)
+- **Motion**: analytic IMU synthesis (drop/throw/push/shake w/ original param semantics + LSM6DSO
+  noise model) — procedural batch → EI upload or zip w/ `info.labels`; manual record path
+- **Robotics**: kinematic rover (cruise/collision/stuck + analytic ray-AABB lidar) and Braccio arm
+  (5 trajectories via ported IK, pickup outcome metadata) — live rigs, POV camera PiP, 20 Hz
+  recording, upload/zip routing, ROS 2 JSONL export, POV image capture with boxes
 
-- Workflow `build-ui-and-modes`: UI primitives (CollapsibleCard/ToggleSwitch/SliderRow/
-  NumberField/RadioPills), VisionPanel + capture/realism/objects cards + PiP sync,
-  EI auth/upload/inference cards + overlay, motion runner (analytic IMU synthesis) + MotionPanel,
-  robot sims (kinematic rover + lidar, Braccio arm playback) + robotRunner + RobotPanel + rigs
-- Agent writing docs/ORIGINAL-FEATURES.md + docs/FEATURE-PARITY.md from the 7-reader feature map
+**Edge Impulse** — full ported client (65 tests): auth card, category/split, ingestion uploads
+(images w/ `x-bounding-boxes`, IMU/lidar/fused acquisition JSON + HMAC), Studio API (projects,
+deployment history, build wasm, retrain, job polling), in-browser WASM inference cards + overlay.
+*Not yet exercised against a live EI project — needs a real API key (user).*
 
-## Key technical decisions
+**Platform** — dark/light theme, URL presets (`?mode= ?seed= ?camera= ?apiKey=` etc.),
+embed/minimal chrome flags, localStorage persistence (v1), hidden-tab-safe capture.
 
-1. **Engine-direct, not @playcanvas/react** — capture needs render-target control.
-2. Splat creation via `GSplatContainer` writable textures (dataCenter RGBA32F xyz+size,
-   dataColor RGBA16F); component `unified: true`; resource `.aabb` gives capture bboxes.
-3. Physics: none yet. Spawned objects "instant-settle" onto the ground plane (rest-Y from kind
-   dims). Real physics (Ammo or Rapier) + conveyor tracked in TODO Phase 5.
-4. Motion IMU: analytic kinematic synthesis (no MuJoCo). Marked "changed by design" in parity.
-5. Robot sims: pure-TS kinematic choreography + analytic ray-AABB lidar (no MuJoCo), engine only
-   for visuals/POV camera. Fully unit-testable.
-6. PiP preview = second camera with `camera.rect` viewport (no readback); offscreen CaptureRig is
-   a separate camera; EI inference grabs pixels through CaptureRig when idle.
-7. Hidden-tab robustness: `nextFrame()` pumps `app.tick` manually; readback `immediate: true`.
+## Known gaps (tracked in TODO.md)
 
-## Next steps (in order)
+- `.spz` import (needs SpzParser + zstd wasm); image→splat; splat paint-tint; exporting *edited
+  imported* scans (needs GPU stream readback)
+- Physics engine + conveyor (objects instant-settle for now); hand tracking (MediaPipe); USDZ
+- Env preset skyboxes (warehouse/outdoor), custom floor/wall textures
+- Entity click-selection/gizmos in viewport; iframe height messaging; deploy
+- Minor: robot zip filename index uses buildFileName timestamp counter (name said `_3` on a
+  2-count run — check `robotRunner` zip naming against contract)
 
-1. Integrate the UI workflow output: fix cross-agent seams, typecheck, run all tests
-2. Visual verification pass in browser (all modes), fix bugs
-3. Wire splat backdrop UX (hide ground when backdrop present), splat edit (crop/delete/paint) +
-   .ply export
-4. Update docs/FEATURE-PARITY.md against reality; refresh this file; push
-5. Remaining Phase 6 platform work (see TODO.md): USDZ import, hand tracking, IndexedDB asset
-   persistence, CI workflow, iframe height messaging
+## Architecture cheat-sheet (details in docs/ARCHITECTURE.md)
 
-## Gotchas for the next agent
+- `src/lib/` renderer-agnostic + fully tested (the EI wire formats are locked by ported tests)
+- `StudioEngine` facade owns managers (splats/models/objects/capture/editor); store↔engine sync
+  lives in `EngineContext` (never call `engine.objects.sync` from UI)
+- Mode runners (`src/modes/*.ts`) are pure orchestration over the facade; panels only trigger them
+- Dev handles: `window.__studio` (engine), `window.__useStore` (store — survives HMR forks)
 
-- `npx tsc --noEmit -p tsconfig.app.json` + `npx vitest run` must both stay clean.
-- Never set a local git identity; global config signs as Jenny Speelman <jenny@edgeimpulse.com>.
-- The engine mirrors `store.sceneObjects` via subscription in EngineContext; UI must never call
-  `engine.objects.sync` directly.
-- CaptureRig is single-flight (`capturing` guard) — EI live inference must skip ticks while a
-  batch runs.
-- Realism internal mode value must stay the string `'random'` (UI label "Photo FX").
-- Dev-only `window.__studio` exposes the engine for console debugging.
+## Session 1 stats
+
+~90 files of source + tests written; 399 tests green; 4 workflows / 18 subagents used
+(feature-mapping, lib porting, docs, UI build-out); every mode verified live in the browser.

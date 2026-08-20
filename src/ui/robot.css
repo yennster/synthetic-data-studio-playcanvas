@@ -1,0 +1,59 @@
+/* ------------------------------------------------------------------ *
+ * Robot panel styles. Built only from the styles.css design tokens;   *
+ * everything shared (pills, sliders, switches, number fields) comes   *
+ * from primitives.css — this file just handles the panel-specific     *
+ * layout bits.                                                        *
+ * ------------------------------------------------------------------ */
+
+/* Vertical rhythm inside a card body. */
+.robot-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Rig selector: two equal buttons, same look as the mode grid. */
+.robot-kind-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.robot-kind-grid button {
+  padding: 8px 4px;
+  font-size: 11px;
+}
+
+/* Muted helper copy under pickers and in the Generate summary. */
+.robot-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.robot-hint strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Two fields side by side (count/duration, width/height). */
+.robot-row {
+  display: flex;
+  gap: 8px;
+}
+
+.robot-row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Live sample tally while a window records. */
+.robot-counter {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.robot-counter.live {
+  color: var(--accent-2);
+}

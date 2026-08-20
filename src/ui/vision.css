@@ -1,0 +1,253 @@
+/* ------------------------------------------------------------------ *
+ * Vision panel + shared SceneObjects / Realism cards.                 *
+ * Namespaced `vision-` / `so-` / `capture-` / `vc-` so panel styles   *
+ * can't collide with the ui- primitives or other panels. Built from   *
+ * the design tokens in styles.css only.                               *
+ * ------------------------------------------------------------------ */
+
+/* Vertical rhythm inside a card body. */
+.vision-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Horizontal group; children share the width unless flagged flex-none. */
+.vision-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.vision-row > * {
+  flex: 1;
+  min-width: 0;
+}
+.vision-row > .flex-none {
+  flex: none;
+}
+
+/* Labeled field column matching the SliderRow micro-label look. */
+.vision-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.vision-help {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+}
+
+/* Aside-style note (Scene card roadmap pointer). */
+.vision-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  border-left: 2px solid var(--panel-border);
+  padding-left: 8px;
+}
+
+/* Swatch-sized color input. */
+.vision-color {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #1b1f26;
+  cursor: pointer;
+}
+
+/* Checkbox row. */
+.vision-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.vision-check input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+.vision-check.disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Bare range input for inline rows (mirrors the primitives' slider
+ * look without reaching into their namespace). */
+.vision-range {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.vision-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.vision-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--panel-border);
+}
+.vision-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.vision-range::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--panel-border);
+}
+.vision-range::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ============ Scene objects card ============ */
+
+.so-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.so-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.so-row-main {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.so-row-main input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.so-kind {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.so-size-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.so-size-number {
+  width: 64px;
+  flex: none;
+}
+
+/* ============ Capture card ============ */
+
+.capture-topline {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+.capture-topline .vision-field {
+  flex: 1;
+  min-width: 0;
+}
+.capture-topline button {
+  flex: none;
+  white-space: nowrap;
+}
+
+.capture-randomize {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+.capture-randomize legend {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0 4px;
+}
+
+.capture-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ============ Virtual-camera PiP frame ============ */
+
+/* DOM outline around the in-canvas PiP render. Position/size mirror
+ * computePipRect (fixed = viewport = full-window canvas). Pointer
+ * events pass through so the frame never blocks orbit input. */
+.vc-pip-frame {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.vc-pip-label {
+  position: absolute;
+  left: -1px;
+  top: 0;
+  transform: translateY(-100%);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 2px 8px;
+  white-space: nowrap;
+}

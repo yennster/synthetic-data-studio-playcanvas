@@ -39,20 +39,20 @@
 - [x] ZIP export in exact EI layout (bounding_boxes.labels sidecar; STORE-only writer)
 - [x] Realism pixel pass (ported: chromatic→jitter→vignette→grain, JPEG round-trip)
 - [x] Seeded RNG (mulberry32, ?seed=)
-- [~] Vision capture UI cards (agent in flight)
+- [x] Vision capture UI cards (Scene/Objects/VirtualCamera/Realism/Capture, PiP preview)
 
 ## Phase 4 — Edge Impulse
 - [x] Full EI client ported (ingestion + Studio API + sidecars, 65 tests)
 - [x] WASM model loader ported (eiModel.ts, all Emscripten quirks)
-- [~] Auth card / upload card / inference card + overlay (agent in flight)
+- [x] Auth card / upload card / inference card + overlay
 - [ ] Verify a real end-to-end upload against a live EI project (needs API key — user)
 
 ## Phase 5 — Modes
-- [~] Object detection + visual anomaly modes (vision panel agent in flight)
-- [~] Motion mode: analytic IMU synthesis + panel (agent in flight; MuJoCo parity marked 🔀)
-- [~] Rover: kinematic sim + lidar (ray-AABB) + panel + rig (agents in flight)
-- [~] Arm: Braccio playback via ported IK/trajectories + rig (agents in flight)
-- [ ] Robot POV image capture wiring (runner captureImage → POV camera through CaptureRig)
+- [x] Object detection + visual anomaly modes (verified in-browser)
+- [x] Motion mode: analytic IMU synthesis + panel (MuJoCo parity marked 🔀; verified)
+- [x] Rover: kinematic sim + lidar (ray-AABB) + panel + rig (verified)
+- [x] Arm: Braccio playback via ported IK/trajectories + rig (verified)
+- [x] Robot POV image capture wiring (runner captureImage → POV camera through CaptureRig)
 - [ ] Physics: real dynamics (Ammo/Rapier), conveyor belt, drop/settle behaviors
 - [ ] Hand tracking (MediaPipe) for motion mode
 - [ ] Realism diffusion mode endpoint (api/realism-diffusion port — hidden mode, low priority)

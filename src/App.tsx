@@ -2,8 +2,15 @@ import { EngineProvider } from './engine/EngineContext';
 import { Sidebar } from './ui/Sidebar';
 import { Hud } from './ui/Hud';
 import { ThemeSync } from './ui/ThemeSync';
+import { useCaptureCameraSync } from './ui/useCaptureCameraSync';
 import { useStore } from './store/useStore';
 import { URL_FLAGS } from './lib/urlParams';
+
+/** Hook host: keeps the capture/preview cameras in step with the store. */
+function CaptureSync() {
+  useCaptureCameraSync();
+  return null;
+}
 
 export default function App() {
   const engineStatus = useStore((s) => s.engineStatus);
@@ -14,6 +21,7 @@ export default function App() {
   return (
     <EngineProvider>
       <ThemeSync />
+      <CaptureSync />
       <div className={`ui-overlay${noChrome ? ' no-chrome' : ''}`}>
         {!noChrome && <Sidebar />}
         <Hud />
