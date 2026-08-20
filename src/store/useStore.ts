@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SplatEntry } from '../engine/splats/SplatManager';
+import type { ModelEntry } from '../engine/ModelManager';
 
 export type Theme = 'dark' | 'light';
 
@@ -12,11 +13,14 @@ interface StudioState {
   engineError: string | null;
   /** Mirror of SplatManager entries for reactive UI. */
   splats: SplatEntry[];
+  /** Mirror of ModelManager entries for reactive UI. */
+  models: ModelEntry[];
   busyMessage: string | null;
 
   setTheme(theme: Theme): void;
   setEngineStatus(status: EngineStatus, error?: string): void;
   setSplats(entries: SplatEntry[]): void;
+  setModels(entries: ModelEntry[]): void;
   setBusy(message: string | null): void;
 }
 
@@ -25,11 +29,13 @@ export const useStore = create<StudioState>((set) => ({
   engineStatus: 'booting',
   engineError: null,
   splats: [],
+  models: [],
   busyMessage: null,
 
   setTheme: (theme) => set({ theme }),
   setEngineStatus: (engineStatus, error) =>
     set({ engineStatus, engineError: error ?? null }),
   setSplats: (splats) => set({ splats }),
+  setModels: (models) => set({ models }),
   setBusy: (busyMessage) => set({ busyMessage }),
 }));

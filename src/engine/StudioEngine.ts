@@ -11,6 +11,7 @@ import {
 import { CameraControls } from 'playcanvas/scripts/esm/camera-controls.mjs';
 import { createApp } from './createApp';
 import { createSceneEnvironment, type SceneEnvironment } from './sceneEnvironment';
+import { ModelManager } from './ModelManager';
 import { SplatManager } from './splats/SplatManager';
 
 /**
@@ -25,6 +26,7 @@ export class StudioEngine {
   viewCamera: Entity;
   environment: SceneEnvironment;
   splats: SplatManager;
+  models: ModelManager;
   private cameraControls: any;
 
   private constructor(app: AppBase) {
@@ -35,6 +37,7 @@ export class StudioEngine {
 
     this.environment = createSceneEnvironment(app, this.content);
     this.splats = new SplatManager(app, this.content);
+    this.models = new ModelManager(app, this.content);
 
     this.viewCamera = new Entity('view-camera', app);
     this.viewCamera.addComponent('camera', {
@@ -72,6 +75,7 @@ export class StudioEngine {
   }
 
   destroy(): void {
+    this.models.destroy();
     this.splats.destroy();
     this.environment.destroy();
     this.app.destroy();
