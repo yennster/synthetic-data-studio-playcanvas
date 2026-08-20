@@ -5,6 +5,7 @@ import {
   TONEMAP_ACES,
   Vec2,
   Vec3,
+  Vec4,
   type AppBase,
 } from 'playcanvas';
 // eslint-disable-next-line import/no-unresolved
@@ -13,6 +14,7 @@ import { CameraControls } from 'playcanvas/scripts/esm/camera-controls.mjs';
 import { createApp } from './createApp';
 import { createSceneEnvironment, type SceneEnvironment } from './sceneEnvironment';
 import { ModelManager, computeWorldBounds } from './ModelManager';
+import { ObjectManager } from './ObjectManager';
 import { SplatManager } from './splats/SplatManager';
 import { CaptureRig } from './capture/CaptureRig';
 import type { LabelTarget } from './capture/projectBoxes';
@@ -30,7 +32,10 @@ export class StudioEngine {
   environment: SceneEnvironment;
   splats: SplatManager;
   models: ModelManager;
+  objects: ObjectManager;
   capture: CaptureRig;
+  /** In-canvas picture-in-picture preview of the capture camera. */
+  previewCamera: Entity;
   private cameraControls: any;
 
   private constructor(app: AppBase) {
@@ -42,7 +47,21 @@ export class StudioEngine {
     this.environment = createSceneEnvironment(app, this.content);
     this.splats = new SplatManager(app, this.content);
     this.models = new ModelManager(app, this.content);
+    this.objects = new ObjectManager(app, this.content);
     this.capture = new CaptureRig(app);
+
+    this.previewCamera = new Entity('preview-camera', app);
+    this.previewCamera.addComponent('camera', {
+      fov: 45,
+      nearClip: 0.05,
+      farClip: 100,
+      clearColor: new Color(0.08, 0.09, 0.11),
+      toneMapping: TONEMAP_ACES,
+      priority: 1, // render the PiP after the main view
+      rect: new Vec4(0.02, 0.02, 0.25, 0.25),
+    });
+    this.previewCamera.enabled = false;
+    app.root.addChild(this.previewCamera);
 
     this.viewCamera = new Entity('view-camera', app);
     this.viewCamera.addComponent('camera', {
@@ -80,12 +99,48 @@ export class StudioEngine {
   }
 
   /**
+   * Poses the capture + preview cameras from capture settings. The preview
+   * camera is the in-canvas PiP; the capture rig renders offscreen.
+   */
+  setCaptureCameraPose(
+    pos: [number, number, number],
+    target: [number, number, number],
+    fov: number
+  ): void {
+    const p = new Vec3(pos[0], pos[1], pos[2]);
+    const t = new Vec3(target[0], target[1], target[2]);
+    this.capture.setPose(p, t);
+    this.capture.setFov(fov);
+    this.previewCamera.setPosition(p);
+    this.previewCamera.lookAt(t);
+    this.previewCamera.camera!.fov = fov;
+  }
+
+  /** Shows/hides the PiP preview and sets its viewport in CSS pixels. */
+  setPreviewRect(visible: boolean, rect?: { x: number; y: number; w: number; h: number }): void {
+    this.previewCamera.enabled = visible;
+    if (visible && rect) {
+      const canvas = this.app.graphicsDevice.canvas as HTMLCanvasElement;
+      const cw = canvas.clientWidth || 1;
+      const ch = canvas.clientHeight || 1;
+      this.previewCamera.camera!.rect = new Vec4(
+        rect.x / cw,
+        // rect Y is measured from the bottom of the canvas
+        1 - (rect.y + rect.h) / ch,
+        rect.w / cw,
+        rect.h / ch
+      );
+    }
+  }
+
+  /**
    * Collects the labelled capture targets for bounding-box computation:
-   * imported models (one box across all mesh instances) and splats with
-   * role 'object' (resource AABB transformed to world space).
+   * spawned primitives, imported models (one box across all mesh
+   * instances), and splats with role 'object' (resource AABB transformed
+   * to world space).
    */
   getLabelTargets(): LabelTarget[] {
-    const targets: LabelTarget[] = [];
+    const targets: LabelTarget[] = [...this.objects.getLabelTargets()];
     for (const model of this.models.entries) {
       if (!model.entity.enabled) continue;
       const aabb = computeWorldBounds(model.entity);
@@ -107,6 +162,7 @@ export class StudioEngine {
 
   destroy(): void {
     this.capture.destroy();
+    this.objects.destroy();
     this.models.destroy();
     this.splats.destroy();
     this.environment.destroy();
