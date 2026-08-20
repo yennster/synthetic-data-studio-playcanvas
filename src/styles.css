@@ -2,12 +2,25 @@
   --bg: #0e1013;
   --panel: rgba(20, 23, 28, 0.92);
   --panel-border: #2a2f38;
+  --panel-raised: #1b1f26;
+  --panel-hover: #232833;
   --text: #e8eaed;
   --text-dim: #9aa2ad;
   --accent: #ff5c1a; /* PlayCanvas orange */
   --accent-2: #3ddc84;
   --error: #ff5c5c;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+:root[data-theme='light'] {
+  --bg: #eef0f3;
+  --panel: rgba(252, 252, 253, 0.94);
+  --panel-border: #d4d8df;
+  --panel-raised: #f2f3f6;
+  --panel-hover: #e7e9ee;
+  --text: #1a1d22;
+  --text-dim: #5b6470;
+  --error: #c62828;
 }
 
 * {
@@ -106,7 +119,7 @@ body,
 }
 
 button {
-  background: #1b1f26;
+  background: var(--panel-raised);
   color: var(--text);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
@@ -117,8 +130,18 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: #232833;
+  background: var(--panel-hover);
   border-color: var(--accent);
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel-raised));
+}
+
+button.danger {
+  border-color: var(--error);
+  color: var(--error);
 }
 
 button:disabled {
@@ -158,13 +181,91 @@ button.icon {
   white-space: nowrap;
 }
 
-select {
-  background: #1b1f26;
+select,
+input[type='text'],
+input[type='number'],
+input[type='password'] {
+  background: var(--panel-raised);
   color: var(--text);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   font-size: 11px;
-  padding: 3px 4px;
+  padding: 3px 6px;
+}
+
+.app-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.theme-toggle {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.mode-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 344px;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+  flex-wrap: wrap;
+  max-width: calc(100% - 500px);
+}
+
+.no-chrome .hud {
+  left: 12px;
+}
+
+.hud-pill {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.hud-pill.live {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+.status-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.status-bar.status-err {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.status-bar.status-busy {
+  border-color: var(--accent);
+}
+
+.status-bar.status-ok {
+  border-color: var(--accent-2);
 }
 
 .status-pill {

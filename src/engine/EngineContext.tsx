@@ -42,6 +42,14 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         instance = created;
         created.splats.onChange(setSplats);
         created.models.onChange(useStore.getState().setModels);
+        // Mirror store scene objects into engine entities.
+        created.objects.sync(useStore.getState().sceneObjects);
+        const unsubObjects = useStore.subscribe((state, prev) => {
+          if (state.sceneObjects !== prev.sceneObjects) {
+            created.objects.sync(state.sceneObjects);
+          }
+        });
+        created.app.on('destroy', unsubObjects);
         setEngine(created);
         setEngineStatus('ready');
         if (import.meta.env.DEV) {

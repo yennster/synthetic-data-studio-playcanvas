@@ -1,24 +1,22 @@
 import { EngineProvider } from './engine/EngineContext';
-import { SplatLibrary } from './ui/SplatLibrary';
-import { ModelLibrary } from './ui/ModelLibrary';
+import { Sidebar } from './ui/Sidebar';
+import { Hud } from './ui/Hud';
+import { ThemeSync } from './ui/ThemeSync';
 import { useStore } from './store/useStore';
+import { URL_FLAGS } from './lib/urlParams';
 
 export default function App() {
   const engineStatus = useStore((s) => s.engineStatus);
   const engineError = useStore((s) => s.engineError);
   const busyMessage = useStore((s) => s.busyMessage);
+  const noChrome = URL_FLAGS.embed || URL_FLAGS.ui === 'minimal';
 
   return (
     <EngineProvider>
-      <div className="ui-overlay">
-        <aside className="sidebar">
-          <header className="app-header">
-            <h1>Synthetic Data Studio</h1>
-            <p className="tagline">PlayCanvas · Gaussian Splats · Edge Impulse</p>
-          </header>
-          <SplatLibrary />
-          <ModelLibrary />
-        </aside>
+      <ThemeSync />
+      <div className={`ui-overlay${noChrome ? ' no-chrome' : ''}`}>
+        {!noChrome && <Sidebar />}
+        <Hud />
         {engineStatus === 'booting' && <div className="status-pill">Starting engine…</div>}
         {engineStatus === 'error' && (
           <div className="status-pill error">Engine failed: {engineError}</div>
