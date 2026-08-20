@@ -1,0 +1,53 @@
+{
+  "name": "@yennster/synthetic-data-studio-playcanvas",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "playcanvas": "^2.21.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "@vitest/coverage-v8": "^4.1.11",
+    "happy-dom": "^20.11.6",
+    "oxlint": "^1.75.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
+  },
+  "description": "Browser-based 3D synthetic-data studio for Edge Impulse rebuilt on the PlayCanvas engine — gaussian splat import and in-app splat creation for hyper-realistic synthetic data, plus motion IMU, object detection, visual anomaly, and robotics rover/arm modes with direct ingestion uploads.",
+  "license": "Apache-2.0",
+  "author": "Jenny Speelman <jenny@edgeimpulse.com> (https://github.com/yennster)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yennster/synthetic-data-studio-playcanvas.git"
+  },
+  "keywords": [
+    "edge-impulse",
+    "synthetic-data",
+    "machine-learning",
+    "object-detection",
+    "anomaly-detection",
+    "gaussian-splatting",
+    "gsplat",
+    "playcanvas",
+    "3dgs",
+    "accelerometer",
+    "react"
+  ]
+}
