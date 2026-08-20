@@ -62,6 +62,15 @@ export class StudioEngine {
     this.capture = new CaptureRig(app);
     this.splatEditor = new SplatEditor(app);
     this.setupEraseInput();
+    // Removing a splat releases its edit processors and drops the brush.
+    this.splats.onChange((entries) => {
+      const live = new Set(entries.map((e) => e.entity));
+      this.splatEditor.releaseExcept(live);
+      if (this.eraseTarget && !live.has(this.eraseTarget.entity)) {
+        this.eraseTarget = null;
+        this.erasing = false;
+      }
+    });
 
     this.previewCamera = new Entity('preview-camera', app);
     this.previewCamera.addComponent('camera', {

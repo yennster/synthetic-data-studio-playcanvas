@@ -1,5 +1,32 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
+
+/**
+ * localStorage with trailing-edge throttled writes. zustand's persist
+ * middleware fires on EVERY set(), and recording pushes samples at up to
+ * 500 Hz — synchronous setItem at that rate starves the sampler on slow
+ * machines. The last pending value always lands within `delayMs`.
+ */
+function throttledLocalStorage(delayMs: number): Storage {
+  let pending: { key: string; value: string } | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const flush = () => {
+    timer = null;
+    if (pending) localStorage.setItem(pending.key, pending.value);
+    pending = null;
+  };
+  return {
+    getItem: (k: string) => localStorage.getItem(k),
+    removeItem: (k: string) => {
+      pending = null;
+      localStorage.removeItem(k);
+    },
+    setItem: (key: string, value: string) => {
+      pending = { key, value };
+      if (timer === null) timer = setTimeout(flush, delayMs);
+    },
+  } as Storage;
+}
 import type { SplatEntry } from '../engine/splats/SplatManager';
 import type { ModelEntry } from '../engine/ModelManager';
 import type {
@@ -461,6 +488,7 @@ export const useStore = create<StudioState>()(
     {
       name: 'sds-pc-store',
       version: 1,
+      storage: createJSONStorage(() => throttledLocalStorage(500)),
       partialize: (s) => ({
         theme: s.theme,
         mode: s.mode,

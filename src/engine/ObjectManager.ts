@@ -65,6 +65,7 @@ export class ObjectManager {
     for (const [id, m] of this.managed) {
       if (!seen.has(id)) {
         m.entity.destroy();
+        m.material.destroy();
         this.managed.delete(id);
       }
     }
@@ -144,7 +145,10 @@ export class ObjectManager {
   }
 
   destroy(): void {
-    for (const m of this.managed.values()) m.entity.destroy();
+    for (const m of this.managed.values()) {
+      m.entity.destroy();
+      m.material.destroy();
+    }
     this.managed.clear();
   }
 }

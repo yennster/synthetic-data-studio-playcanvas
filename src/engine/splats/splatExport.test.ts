@@ -28,9 +28,10 @@ describe('pointsToPly', () => {
       .indexOf('end_header\n') + 'end_header\n'.length;
     const view = new DataView(buf, headerLen);
 
-    // First point: x, y, z
-    expect(view.getFloat32(0, true)).toBeCloseTo(1);
-    expect(view.getFloat32(4, true)).toBeCloseTo(2);
+    // First point: written Y-down (−x, −y, z) per the 3DGS convention so
+    // the importer's 180° Z flip round-trips.
+    expect(view.getFloat32(0, true)).toBeCloseTo(-1);
+    expect(view.getFloat32(4, true)).toBeCloseTo(-2);
     expect(view.getFloat32(8, true)).toBeCloseTo(3);
     // f_dc_0 for r=1: (1 - 0.5) / SH_C0
     expect(view.getFloat32(12, true)).toBeCloseTo(0.5 / SH_C0, 4);

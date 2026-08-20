@@ -289,7 +289,15 @@ export function createRoverSim(opts: RoverSimOptions): RoverSim {
   let prevHeading = p0.heading - w0 * tickSec;
   let prevVx = v0x;
   let prevVz = v0z;
-  let prevContact = false;
+  // Seeded from the start state: a 'stuck' run BEGINS pinned against its
+  // obstacle, and treating that as a fresh contact would stamp a
+  // collision-onset jolt onto the first ~200 ms — precisely the feature
+  // that separates the 'collision' and 'stuck' classes.
+  let prevContact = resolveContact(
+    path.sample(0).x,
+    path.sample(0).z,
+    discs
+  ).contact;
   // Ringing contact-jolt accumulator (world-frame m/s²).
   let impulseX = 0;
   let impulseY = 0;

@@ -441,6 +441,11 @@ export async function runRobotBatch(
    */
   const runWindow = async (
     iterIdx: number,
+    // Invoked after the fresh sim's start pose has been pushed to the
+    // engine visuals but before recording begins — the 'capture at rest'
+    // shot must show THIS iteration's launch pose, not the previous
+    // iteration's end pose (e.g. the rover still parked on an obstacle).
+    beforeTicks?: () => Promise<void>,
   ): Promise<{
     imu: AccelSample[];
     lidar: LidarSample[];
@@ -476,6 +481,9 @@ export async function runRobotBatch(
         timeOriginMs: now(),
       });
       options.onIterationStart?.(iterIdx);
+      options.onRoverPose?.(sim.startPose);
+      options.onRoverContact?.(false);
+      await beforeTicks?.();
       for (let k = 0; k <= ticks; k++) {
         if (isCancelled()) throw new CancelledError();
         const elapsed = Math.min(k * ROBOT_TICK_MS, robot.durationMs);
@@ -508,6 +516,8 @@ export async function runRobotBatch(
       timeOriginMs: now(),
     });
     options.onIterationStart?.(iterIdx);
+    options.onArmJoints?.(sim.startJoints);
+    await beforeTicks?.();
     for (let k = 0; k <= ticks; k++) {
       if (isCancelled()) throw new CancelledError();
       const elapsed = Math.min(k * ROBOT_TICK_MS, robot.durationMs);
@@ -758,11 +768,14 @@ export async function runRobotBatch(
         imagesZipped: result.imagesZipped,
         failed: result.failed,
       });
-      if (canCaptureImages && robot.captureAtRest) {
-        // At rest the robot is stationary — pin to exactly one shot.
-        await captureAndRouteImage(i, 'rest');
-      }
-      const window = await runWindow(i);
+      const window = await runWindow(
+        i,
+        canCaptureImages && robot.captureAtRest
+          ? // At rest the robot is stationary — pin to exactly one shot,
+            // taken after the fresh sim's start pose reaches the visuals.
+            () => captureAndRouteImage(i, 'rest')
+          : undefined
+      );
       if (robot.kind === 'rover') {
         await routeRoverSensors(i, window.imu, window.lidar);
       } else {

@@ -48,6 +48,20 @@ deployment history, build wasm, retrain, job polling), in-browser WASM inference
 **Platform** — dark/light theme, URL presets (`?mode= ?seed= ?camera= ?apiKey=` etc.),
 embed/minimal chrome flags, localStorage persistence (v1), hidden-tab-safe capture.
 
+## Adversarial review (done end of session 1)
+
+A 5-dimension review workflow (EI wire formats / capture / React-store lifecycle / engine
+resources / sims) surfaced 36 findings; every confirmed one is fixed and pushed:
+capture-rig serialization queue with per-request pose, owner-scoped label targets,
+base-anchored (non-compounding) batch randomization, **specific-force IMU convention**
+(+1 g at rest, 0 in free fall — was inverted), rehydrate/persistence hazards
+(mid-restore snapshot wipe, blob deletion on transient errors, hidden-mesh state),
+splat asset/processor/material lifecycle leaks, run-lock on mode switching, robot
+zip naming, capture-at-rest pose ordering, stuck-event contact seeding, robot-POV
+inference source + aspect handling, throttled localStorage persistence.
+One finding rejected as a false positive (draw_circle direction — the original is
+also always-CCW; the port is faithful).
+
 ## Known gaps (tracked in TODO.md)
 
 - `.spz` import (needs SpzParser + zstd wasm); image→splat; splat paint-tint; exporting *edited
@@ -55,8 +69,8 @@ embed/minimal chrome flags, localStorage persistence (v1), hidden-tab-safe captu
 - Physics engine + conveyor (objects instant-settle for now); hand tracking (MediaPipe); USDZ
 - Env preset skyboxes (warehouse/outdoor), custom floor/wall textures
 - Entity click-selection/gizmos in viewport; iframe height messaging; deploy
-- Minor: robot zip filename index uses buildFileName timestamp counter (name said `_3` on a
-  2-count run — check `robotRunner` zip naming against contract)
+- IndexedDB quota failures on huge scans are console-warned only — surface in UI
+- Live EI upload not yet exercised against a real project (needs an API key — user)
 
 ## Architecture cheat-sheet (details in docs/ARCHITECTURE.md)
 

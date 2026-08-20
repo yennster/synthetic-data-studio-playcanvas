@@ -230,6 +230,13 @@ export class SplatEditor {
     }
   }
 
+  /** Releases edit state for every entity NOT in `live` (removal sweep). */
+  releaseExcept(live: ReadonlySet<Entity>): void {
+    for (const entity of [...this.states.keys()]) {
+      if (!live.has(entity)) this.release(entity);
+    }
+  }
+
   destroy(): void {
     for (const state of this.states.values()) {
       state.sphereProc.destroy();

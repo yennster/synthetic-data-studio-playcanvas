@@ -11,6 +11,11 @@ const SH_C0 = 0.28209479177387814;
  * Mapping from our simple isotropic format: f_dc = (color - 0.5) / SH_C0,
  * opacity = logit(alpha), scale_* = ln(size / 2) (isotropic sigma),
  * rot = identity quaternion (w, x, y, z).
+ *
+ * Orientation: 3DGS PLYs are conventionally Y-down; importers (ours
+ * included) apply a 180° Z rotation on load. Positions are therefore
+ * written as (−x, −y, z) — the same involution — so exports round-trip
+ * through our importer and open upright in SuperSplat and friends.
  */
 export function pointsToPly(points: SplatPoint[]): Blob {
   const props = [
@@ -52,8 +57,8 @@ export function pointsToPly(points: SplatPoint[]): Blob {
   };
 
   for (const p of points) {
-    write(p.x);
-    write(p.y);
+    write(-p.x);
+    write(-p.y);
     write(p.z);
     write((p.r - 0.5) / SH_C0);
     write((p.g - 0.5) / SH_C0);
