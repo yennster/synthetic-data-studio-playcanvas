@@ -14,7 +14,7 @@
 A ground-up reimplementation of [yennster/synthetic-data-studio](https://github.com/yennster/synthetic-data-studio)
 (React + three.js) on the **PlayCanvas engine**, adding **gaussian splat import and in-app splat
 creation/editing** for hyper-realistic synthetic data. Repo:
-`github.com/yennster/synthetic-data-studio-playcanvas` (private).
+`github.com/yennster/synthetic-data-studio-playcanvas` (audited & prepped for public release).
 
 - **Deployed: <https://canvas.jennyspeelman.dev>** (Vercel project
   `synthetic-data-studio-playcanvas`, GitHub-connected + `vercel deploy --prod` from the CLI).
@@ -46,10 +46,14 @@ creation/editing** for hyper-realistic synthetic data. Repo:
   scrub; Capture card redesigned (chips/sections); sidebar collapse toggle; first-load
   yes/no prompt for the Apartment scan; URL flags wired (onlyMode/gizmos/clearStore/
   autoUpload) + docs/url-parameters.md
-- **Open**: curated hyperreal splat OBJECT scans — no verified-license CC source found
-  (engine's skull/guitar/biker lack license files; superspl.at has no stable asset URLs;
-  Poly Haven has no splat category). Users can import their own Polycam/Luma/SuperSplat
-  exports; revisit when a licensed object-scan library appears
+- **Media**: README carries commented placeholders for user-provided screenshots
+  (docs/media/hero.jpg, path.jpg, edit.jpg); demo video dropped per user request.
+  docs/GETTING-STARTED.md + docs/SAMPLE-CREDITS.md added; repo audited for public
+  release (no secrets in tree or history, single signed identity, .vercel ignored)
+- **Splat object samples**: Skull / Guitar / Biker from the PlayCanvas engine examples added
+  to the gallery per the user's decision, attributed to PlayCanvas (docs/SAMPLE-CREDITS.md
+  invites authors to request changes). Tight boxes via percentile screen-space projection of
+  actual splat centers / mesh vertices; per-label palette colors
 
 ## Working today (all verified in-browser this session)
 
@@ -100,7 +104,7 @@ also always-CCW; the port is faithful).
   imported* scans (needs GPU stream readback)
 - Physics engine + conveyor (objects instant-settle for now); hand tracking (MediaPipe); USDZ
 - Env preset skyboxes (warehouse/outdoor), custom floor/wall textures
-- Entity click-selection/gizmos in viewport; iframe height messaging; deploy
+- Iframe height messaging (embed flag works; height postMessage not ported)
 - IndexedDB quota failures on huge scans are console-warned only — surface in UI
 - Live EI upload not yet exercised against a real project (needs an API key — user)
 

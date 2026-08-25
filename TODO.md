@@ -16,7 +16,7 @@
 - [x] `src/engine/createApp.ts`: AppBase bootstrap (GSplat systems, handlers, fill window)
 - [x] Scene environment: ground + two-light rig, theme-aware colors
 - [x] View camera with CameraControls orbit/pan/zoom
-- [ ] Entity selection: click-select, multi-select, viewport drag-move of objects (original parity; numeric transforms + gizmo drag exist)
+- [x] Entity selection: click-select + viewport drag/rotate/scale (SelectionController); multi-select still open
 - [x] Capture-camera gizmo (frustum + target marker + trajectory path on the Immediate layer, excluded from captures) with draggable handles (Shift = height)
 
 ## Phase 2 — Gaussian splats (new headline feature)
@@ -65,4 +65,4 @@
 - [x] Persistence (localStorage v1 + IndexedDB assets)
 - [ ] Iframe embed height messaging (initPostContentHeight port); embed docs
 - [ ] Custom floor/skybox textures + env presets (studio/warehouse/whitebox/outdoor)
-- [ ] Deploy (Vercel) + og-card + screenshots
+- [x] Deploy (Vercel → canvas.jennyspeelman.dev); README screenshots: user-provided, placeholders in README
