@@ -342,6 +342,7 @@ export function RobotPanel() {
   // wide) with the object-detection aspect.
   const povWidth = robot.objectDetectionWidth;
   const povHeight = robot.objectDetectionHeight;
+  const pipWidth = useStore((s) => s.pipWidth);
   useEffect(() => {
     if (!engine) return;
     const cam = engine.previewCamera;
@@ -351,7 +352,10 @@ export function RobotPanel() {
     const applyRect = () => {
       const canvas = engine.app.graphicsDevice.canvas as HTMLCanvasElement;
       const canvasHeight = canvas.clientHeight || window.innerHeight;
-      engine.setPreviewRect(true, computePipRect(povWidth, povHeight, canvasHeight));
+      engine.setPreviewRect(
+        true,
+        computePipRect(povWidth, povHeight, canvasHeight, undefined, pipWidth)
+      );
     };
     applyRect();
     window.addEventListener('resize', applyRect);
@@ -379,7 +383,7 @@ export function RobotPanel() {
       engine.setPreviewRect(false);
       cam.camera!.fov = prevFov;
     };
-  }, [engine, currentAnchors, povWidth, povHeight]);
+  }, [engine, currentAnchors, povWidth, povHeight, pipWidth]);
 
   /**
    * Object-detection capture callback for the runner: renders one frame

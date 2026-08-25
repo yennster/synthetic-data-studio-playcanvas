@@ -19,7 +19,7 @@ import { RealismCard } from './RealismCard';
 import { EiAuthCard } from './EiAuthCard';
 import { EiInferenceCard } from './EiInferenceCard';
 import { EiUploadCard } from './EiUploadCard';
-import { PIP_WIDTH, pipHeight } from './useCaptureCameraSync';
+import { pipHeight } from './useCaptureCameraSync';
 import './vision.css';
 
 /**
@@ -646,19 +646,45 @@ function CaptureCard() {
  * DOM outline + label over the engine's in-canvas PiP preview. The PiP
  * itself is rendered by the preview camera (placed by
  * useCaptureCameraSync); this element just frames it. Size mirrors
- * computePipRect: fixed 240 px width, height from the capture aspect,
- * 12 px from the bottom-left corner.
+ * computePipRect: user-resizable width (drag the ↖ corner handle),
+ * height from the capture aspect, anchored 12 px from the bottom-right.
  */
 function VirtualCameraFrame() {
   const width = useStore((s) => s.capture.width);
   const height = useStore((s) => s.capture.height);
+  const pipWidth = useStore((s) => s.pipWidth);
+  const setPipWidth = useStore((s) => s.setPipWidth);
+
+  const onResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    // The frame is anchored at the bottom-right; dragging the top-left
+    // corner grows toward the cursor. Width follows the pointer's
+    // distance from the right screen edge; height follows the aspect.
+    const rightEdge = window.innerWidth - 12;
+    const move = (ev: PointerEvent) => setPipWidth(rightEdge - ev.clientX);
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
   return (
     <div
       className="vc-pip-frame"
-      style={{ width: PIP_WIDTH, height: pipHeight(width, height) }}
-      aria-hidden="true"
+      style={{ width: pipWidth, height: pipHeight(width, height, pipWidth) }}
     >
       <span className="vc-pip-label">Virtual camera</span>
+      <span
+        className="vc-pip-resize"
+        role="separator"
+        aria-label="Resize the virtual camera preview"
+        title="Drag to resize"
+        onPointerDown={onResizeStart}
+      >
+        ⤡
+      </span>
     </div>
   );
 }

@@ -277,10 +277,35 @@
   position: fixed;
   right: 12px;
   bottom: 12px;
-  pointer-events: none;
+  pointer-events: none; /* orbit input passes through; only the handle grabs */
   border: 1px solid var(--accent);
   border-radius: 4px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.vc-pip-resize {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  pointer-events: auto;
+  cursor: nwse-resize;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--accent);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px 0 6px 0;
+  user-select: none;
+  touch-action: none;
+}
+
+.vc-pip-resize:hover {
+  border-color: var(--accent);
 }
 
 .vc-pip-label {

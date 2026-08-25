@@ -4,14 +4,19 @@ import { useStore } from '../store/useStore';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
 import { URL_FLAGS } from '../lib/urlParams';
 
-/** PiP preview width in CSS pixels (fixed; height follows capture aspect). */
+/** Default PiP preview width in CSS pixels (user-resizable via the frame
+ * handle; the live value is `store.pipWidth`). */
 export const PIP_WIDTH = 240;
 /** Margin between the PiP preview and the canvas edges, CSS pixels. */
 export const PIP_MARGIN = 12;
 
-/** PiP height for a given capture resolution: fixed width × aspect. */
-export function pipHeight(captureWidth: number, captureHeight: number): number {
-  return Math.round(PIP_WIDTH * (captureHeight / Math.max(1, captureWidth)));
+/** PiP height for a given capture resolution: width × capture aspect. */
+export function pipHeight(
+  captureWidth: number,
+  captureHeight: number,
+  pipWidth = PIP_WIDTH
+): number {
+  return Math.round(pipWidth * (captureHeight / Math.max(1, captureWidth)));
 }
 
 /**
@@ -24,14 +29,15 @@ export function computePipRect(
   captureWidth: number,
   captureHeight: number,
   canvasHeight: number,
-  canvasWidth?: number
+  canvasWidth?: number,
+  pipWidth = PIP_WIDTH
 ): { x: number; y: number; w: number; h: number } {
-  const h = pipHeight(captureWidth, captureHeight);
+  const h = pipHeight(captureWidth, captureHeight, pipWidth);
   const cw = canvasWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1280);
   return {
-    x: cw - PIP_WIDTH - PIP_MARGIN,
+    x: cw - pipWidth - PIP_MARGIN,
     y: canvasHeight - h - PIP_MARGIN,
-    w: PIP_WIDTH,
+    w: pipWidth,
     h,
   };
 }
@@ -63,6 +69,7 @@ export function useCaptureCameraSync(): void {
   const batchCount = useStore((s) => s.capture.batchCount);
   const lockToTrajectory = useStore((s) => s.capture.lockToTrajectory);
   const trajectoryPhase = useStore((s) => s.capture.trajectoryPhase);
+  const pipWidth = useStore((s) => s.pipWidth);
 
   // Lock mode: the capture camera rides the trajectory scaffold. Any
   // change to the path (or the phase slider) re-derives camPos, so the
@@ -167,7 +174,10 @@ export function useCaptureCameraSync(): void {
       }
       const canvas = engine.app.graphicsDevice.canvas as HTMLCanvasElement;
       const canvasHeight = canvas.clientHeight || window.innerHeight;
-      engine.setPreviewRect(true, computePipRect(width, height, canvasHeight));
+      engine.setPreviewRect(
+        true,
+        computePipRect(width, height, canvasHeight, undefined, pipWidth)
+      );
     };
     apply();
     window.addEventListener('resize', apply);
@@ -175,5 +185,5 @@ export function useCaptureCameraSync(): void {
       window.removeEventListener('resize', apply);
       engine.setPreviewRect(false);
     };
-  }, [engine, mode, width, height]);
+  }, [engine, mode, width, height, pipWidth]);
 }

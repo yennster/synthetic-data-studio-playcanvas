@@ -281,6 +281,8 @@ interface StudioState {
 
   /** Procedural sky panorama behind splat scans / open scenes. */
   skybox: SkyboxPreset;
+  /** Width of the virtual-camera / POV preview overlay, CSS px. */
+  pipWidth: number;
 
   // Vision capture
   capture: CaptureSettings;
@@ -316,6 +318,7 @@ interface StudioState {
   setBusy(message: string | null): void;
   setCardOpen(key: string, open: boolean): void;
   setSkybox(preset: SkyboxPreset): void;
+  setPipWidth(width: number): void;
   setSplats(entries: SplatEntry[]): void;
   setModels(entries: ModelEntry[]): void;
   setPendingSplats(entries: PendingAsset[]): void;
@@ -389,6 +392,7 @@ export const useStore = create<StudioState>()(
       busyMessage: null,
       cardOpen: {},
       skybox: 'none',
+      pipWidth: 240,
 
       splats: [],
       models: [],
@@ -435,6 +439,8 @@ export const useStore = create<StudioState>()(
       setCardOpen: (key, open) =>
         set((s) => ({ cardOpen: { ...s.cardOpen, [key]: open } })),
       setSkybox: (skybox) => set({ skybox }),
+      setPipWidth: (pipWidth) =>
+        set({ pipWidth: Math.min(640, Math.max(140, Math.round(pipWidth))) }),
       setSplats: (splats) => set({ splats }),
       setModels: (models) => set({ models }),
       setPendingSplats: (pendingSplats) => set({ pendingSplats }),
@@ -506,6 +512,7 @@ export const useStore = create<StudioState>()(
         theme: s.theme,
         mode: s.mode,
         skybox: s.skybox,
+        pipWidth: s.pipWidth,
         cardOpen: s.cardOpen,
         sceneObjects: s.sceneObjects,
         capture: s.capture,
