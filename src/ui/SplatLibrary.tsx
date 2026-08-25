@@ -7,6 +7,8 @@ import {
   type SplatEntry,
 } from '../engine/splats/SplatManager';
 import { pointsToPly } from '../engine/splats/splatExport';
+import { centerSplatBackdrop, groundSplatObject } from '../engine/splats/splatPlacement';
+import { snapshotPendingAssets } from '../engine/rehydrateAssets';
 import { saveBlob } from '../lib/captureFormats';
 import { NumberField, SliderRow } from './primitives';
 
@@ -170,6 +172,21 @@ export function SplatLibrary() {
                     onChange={(e) => setBrushRadius(Number(e.target.value))}
                   />
                 </label>
+                <button
+                  title="Re-center this scan: floor to y=0, center over the origin — fixes scans placed before the floor convention (or after manual moves)"
+                  onClick={() => {
+                    if (!engine) return;
+                    const e = engine.splats.get(entry.id);
+                    if (!e) return;
+                    const ok =
+                      e.role === 'backdrop'
+                        ? centerSplatBackdrop(e)
+                        : groundSplatObject(e);
+                    if (ok) snapshotPendingAssets(engine);
+                  }}
+                >
+                  ⌖ Ground here
+                </button>
                 <button
                   onClick={() => {
                     const e = engine?.splats.get(entry.id);

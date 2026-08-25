@@ -1,6 +1,6 @@
 import { Vec3 } from 'playcanvas';
 import type { StudioEngine } from '../engine/StudioEngine';
-import { centerSplatBackdrop } from '../engine/splats/splatPlacement';
+import { centerSplatBackdrop, groundSplatObject } from '../engine/splats/splatPlacement';
 import { snapshotPendingAssets } from '../engine/rehydrateAssets';
 import { fetchSampleFile, type SampleAsset } from '../lib/sampleAssets';
 import { useStore } from '../store/useStore';
@@ -30,6 +30,17 @@ export async function importSampleAsset(
           engine.focusOn(new Vec3(0, 1.2, 0));
           // The import snapshot ran before centering — persist the
           // corrected transform so reloads restore this placement.
+          snapshotPendingAssets(engine);
+        }
+      } else {
+        // Scanned prop: apply the catalog scale, then rest it on the
+        // floor beside the other props (staggered so they don't overlap).
+        if (sample.scale) {
+          engine.splats.setTransform(entry.id, { scale: sample.scale });
+        }
+        const siblings = engine.splats.entries.filter((e) => e.role === 'object').length;
+        const offsetX = ((siblings - 1) % 3) * 0.7 - 0.7;
+        if (groundSplatObject(entry, offsetX, 0.6)) {
           snapshotPendingAssets(engine);
         }
       }

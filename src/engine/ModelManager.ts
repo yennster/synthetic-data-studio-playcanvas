@@ -20,6 +20,8 @@ export interface ModelEntry {
   label: string;
   /** World-space AABB captured at import (before user transforms). */
   bounds: BoundingBox;
+  /** Cached per-mesh vertex samples for tight screen-space label boxes. */
+  meshSamples?: { node: { getWorldTransform(): { transformPoint(v: Vec3, o: Vec3): Vec3 } }; positions: Float32Array }[];
 }
 
 export const MODEL_EXTENSIONS = ['.glb', '.gltf'];
@@ -236,6 +238,54 @@ export class ModelManager {
       .catch((err) => console.warn('model copy persist failed', err));
     this.emit();
     return entry;
+  }
+
+  /**
+   * WORLD-space vertex sample for tight screen-space label boxes (AABB
+   * corner projection overshoots the silhouette). Local vertex samples
+   * are cached per mesh; world transforms are applied per call so the
+   * sample tracks user moves/scales.
+   */
+  labelSamplePoints(entry: ModelEntry): Float32Array | null {
+    if (!entry.meshSamples) {
+      const samples: NonNullable<ModelEntry['meshSamples']> = [];
+      const meshInstances: { mesh: { getPositions(a: number[]): number }; node: never }[] = [];
+      for (const render of entry.entity.findComponents('render') as any[]) {
+        for (const mi of render.meshInstances ?? []) meshInstances.push(mi);
+      }
+      const perMesh = Math.max(200, Math.ceil(4000 / Math.max(1, meshInstances.length)));
+      for (const mi of meshInstances as any[]) {
+        const positions: number[] = [];
+        mi.mesh?.getPositions?.(positions);
+        const count = positions.length / 3;
+        if (count === 0) continue;
+        const step = Math.max(1, Math.floor(count / perMesh));
+        const out: number[] = [];
+        for (let i = 0; i < count; i += step) {
+          out.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+        }
+        samples.push({ node: mi.node, positions: new Float32Array(out) });
+      }
+      entry.meshSamples = samples;
+    }
+    if (entry.meshSamples.length === 0) return null;
+    let total = 0;
+    for (const s of entry.meshSamples) total += s.positions.length;
+    const world = new Float32Array(total);
+    const v = new Vec3();
+    const o = new Vec3();
+    let k = 0;
+    for (const s of entry.meshSamples) {
+      const wt = s.node.getWorldTransform();
+      for (let i = 0; i < s.positions.length; i += 3) {
+        v.set(s.positions[i], s.positions[i + 1], s.positions[i + 2]);
+        wt.transformPoint(v, o);
+        world[k++] = o.x;
+        world[k++] = o.y;
+        world[k++] = o.z;
+      }
+    }
+    return world;
   }
 
   /** Shows/hides a model (e.g. hidden behind its splat conversion). Emits

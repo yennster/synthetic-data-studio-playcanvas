@@ -1,4 +1,4 @@
-import { Vec3 } from 'playcanvas';
+import { BoundingBox, Vec3 } from 'playcanvas';
 import type { SplatEntry } from './SplatManager';
 
 /**
@@ -78,6 +78,67 @@ export function centerSplatBackdrop(entry: SplatEntry): boolean {
     pos.x - stats.center.x,
     pos.y - stats.floorY,
     pos.z - stats.center.z
+  );
+  return true;
+}
+
+/**
+ * Outlier-trimmed LOCAL-space AABB of a splat: per-axis 0.2/99.8
+ * percentile bounds over the splat centers. Scan `resource.aabb`s are
+ * inflated by stray floater splats — bounding boxes, selection, and
+ * click-hit-testing all want the bounds of the VISIBLE reconstruction.
+ */
+export function computeTightLocalAabb(
+  resource: { centers?: Float32Array } | null | undefined
+): BoundingBox | null {
+  const centers = resource?.centers;
+  if (!centers || centers.length < 30) return null;
+  const count = centers.length / 3;
+  const step = Math.max(1, Math.floor(count / 30000));
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const zs: number[] = [];
+  for (let i = 0; i < count; i += step) {
+    xs.push(centers[i * 3]);
+    ys.push(centers[i * 3 + 1]);
+    zs.push(centers[i * 3 + 2]);
+  }
+  const bounds = (a: number[]): [number, number] => {
+    a.sort((p, q) => p - q);
+    const lo = a[Math.floor(a.length * 0.002)];
+    const hi = a[Math.min(a.length - 1, Math.floor(a.length * 0.998))];
+    return [lo, hi];
+  };
+  const [x0, x1] = bounds(xs);
+  const [y0, y1] = bounds(ys);
+  const [z0, z1] = bounds(zs);
+  return new BoundingBox(
+    new Vec3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+    new Vec3(
+      Math.max((x1 - x0) / 2, 0.001),
+      Math.max((y1 - y0) / 2, 0.001),
+      Math.max((z1 - z0) / 2, 0.001)
+    )
+  );
+}
+
+/**
+ * Grounds a splat OBJECT (a scanned prop): its estimated bottom rests at
+ * y = 0 with its center over `(offsetX, 0, offsetZ)`, so scans line up
+ * beside mesh props on whatever floor is active.
+ */
+export function groundSplatObject(
+  entry: SplatEntry,
+  offsetX = 0,
+  offsetZ = 0
+): boolean {
+  const stats = computeSplatWorldStats(entry);
+  if (!stats) return false;
+  const pos = entry.entity.getLocalPosition();
+  entry.entity.setLocalPosition(
+    pos.x - stats.center.x + offsetX,
+    pos.y - stats.floorY,
+    pos.z - stats.center.z + offsetZ
   );
   return true;
 }

@@ -1,10 +1,16 @@
 import { BoundingBox as PcBoundingBox, Mat4, Vec3 } from 'playcanvas';
 import type { BoundingBox } from '../../lib/types';
 
-/** A labelled capture target: one label covering one or more world AABBs. */
+/** A labelled capture target: one label covering one or more world AABBs.
+ * When `worldPoints` (xyz triplets) is provided, the box comes from
+ * percentile bounds of the PROJECTED points instead of AABB corners —
+ * projecting a 3D box's corners systematically overshoots the object's
+ * screen footprint (its depth extent inflates the 2D box at oblique
+ * angles), while projected surface points hug the silhouette. */
 export interface LabelTarget {
   label: string;
   aabbs: PcBoundingBox[];
+  worldPoints?: Float32Array;
 }
 
 const corner = new Vec3();
@@ -54,6 +60,33 @@ export function projectBoundingBoxes(
     let maxY = -Infinity;
     let anyInFront = false;
 
+    if (target.worldPoints && target.worldPoints.length >= 30) {
+      // Point-projection path: percentile-trimmed screen bounds.
+      const pts = target.worldPoints;
+      const xs: number[] = [];
+      const ys: number[] = [];
+      for (let i = 0; i < pts.length; i += 3) {
+        const x = pts[i];
+        const y = pts[i + 1];
+        const z = pts[i + 2];
+        const cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+        if (cw <= 0) continue;
+        const cz = (m[2] * x + m[6] * y + m[10] * z + m[14]) / cw;
+        if (cz > 1) continue;
+        xs.push(((m[0] * x + m[4] * y + m[8] * z + m[12]) / cw * 0.5 + 0.5) * width);
+        ys.push((1 - ((m[1] * x + m[5] * y + m[9] * z + m[13]) / cw * 0.5 + 0.5)) * height);
+      }
+      if (xs.length < 10) continue;
+      xs.sort((a, b) => a - b);
+      ys.sort((a, b) => a - b);
+      const lo = Math.floor(xs.length * 0.005);
+      const hi = Math.min(xs.length - 1, Math.ceil(xs.length * 0.995));
+      minX = xs[lo];
+      maxX = xs[hi];
+      minY = ys[lo];
+      maxY = ys[hi];
+      anyInFront = true;
+    } else {
     for (const aabb of target.aabbs) {
       aabbCorners(aabb, corners);
       for (let i = 0; i < 8; i++) {
@@ -75,6 +108,7 @@ export function projectBoundingBoxes(
         if (sx > maxX) maxX = sx;
         if (sy > maxY) maxY = sy;
       }
+    }
     }
 
     if (!anyInFront) continue;

@@ -1,4 +1,5 @@
-import { Asset, Entity, type AppBase } from 'playcanvas';
+import { Asset, Entity, type AppBase, type BoundingBox } from 'playcanvas';
+import { computeTightLocalAabb } from './splatPlacement';
 import {
   buildSplatContainer,
   primitiveSplatPoints,
@@ -32,6 +33,12 @@ export interface SplatEntry {
   points?: SplatPoint[];
   /** Present for imported splats; unloaded on remove. */
   asset?: Asset;
+  /** Outlier-trimmed local AABB (scan floaters inflate resource.aabb);
+   * used for bounding boxes, selection, and hit-testing. */
+  tightAabb?: BoundingBox;
+  /** Cached LOCAL-space point sample (inside tightAabb) for tight
+   * screen-space bounding boxes. */
+  labelSample?: Float32Array;
 }
 
 export const SPLAT_EXTENSIONS = ['.ply', '.compressed.ply', '.sog'];
@@ -75,6 +82,57 @@ export class SplatManager {
     this.parent.addChild(full.entity);
     this.emit();
     return full;
+  }
+
+  /**
+   * Outlier-trimmed LOCAL AABB for an entry, computed lazily (splat
+   * centers aren't available at the moment the load event fires) and
+   * cached on the entry.
+   */
+  tightLocalAabb(entry: SplatEntry): BoundingBox | null {
+    if (entry.tightAabb) return entry.tightAabb;
+    const resource = entry.entity.gsplat?.resource as
+      | { centers?: Float32Array }
+      | null
+      | undefined;
+    const computed = computeTightLocalAabb(resource);
+    if (computed) entry.tightAabb = computed;
+    return computed;
+  }
+
+  /**
+   * LOCAL-space point sample for screen-space label boxes: up to ~5000
+   * splat centers inside the outlier-trimmed bounds. Lazy + cached.
+   */
+  labelSamplePoints(entry: SplatEntry): Float32Array | null {
+    if (entry.labelSample) return entry.labelSample;
+    const tight = this.tightLocalAabb(entry);
+    const resource = entry.entity.gsplat?.resource as
+      | { centers?: Float32Array }
+      | null
+      | undefined;
+    const centers = resource?.centers;
+    if (!tight || !centers || centers.length < 30) return null;
+    const count = centers.length / 3;
+    const step = Math.max(1, Math.floor(count / 5000));
+    const min = tight.getMin();
+    const max = tight.getMax();
+    const out: number[] = [];
+    for (let i = 0; i < count; i += step) {
+      const x = centers[i * 3];
+      const y = centers[i * 3 + 1];
+      const z = centers[i * 3 + 2];
+      if (
+        x >= min.x && x <= max.x &&
+        y >= min.y && y <= max.y &&
+        z >= min.z && z <= max.z
+      ) {
+        out.push(x, y, z);
+      }
+    }
+    if (out.length < 30) return null;
+    entry.labelSample = new Float32Array(out);
+    return entry.labelSample;
   }
 
   /**

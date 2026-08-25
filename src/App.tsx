@@ -43,15 +43,15 @@ export default function App() {
           sidebarHidden ? ' sidebar-hidden' : ''
         }`}
       >
-        {!noChrome && !sidebarHidden && <Sidebar />}
-        {!noChrome && (
+        {!noChrome && !sidebarHidden && <Sidebar onHide={toggleSidebar} />}
+        {!noChrome && sidebarHidden && (
           <button
             className="sidebar-toggle"
-            title={sidebarHidden ? 'Show the sidebar' : 'Hide the sidebar (more viewport)'}
-            aria-label={sidebarHidden ? 'Show sidebar' : 'Hide sidebar'}
+            title="Show the sidebar"
+            aria-label="Show sidebar"
             onClick={toggleSidebar}
           >
-            {sidebarHidden ? '☰' : '⟨'}
+            ☰
           </button>
         )}
         <Hud />

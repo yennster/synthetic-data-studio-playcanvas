@@ -1,9 +1,11 @@
 /**
- * Curated sample assets: photoreal gaussian-splat environments and
- * showcase GLB props, loaded from public CDNs on demand (then persisted
- * through the normal import path so they survive reloads). Every entry
- * carries its author and license — all are CC-BY-4.0 or CC0, commercial
- * use allowed; the gallery UI displays the credit line.
+ * Curated sample assets: photoreal gaussian-splat environments/objects
+ * and showcase GLB props, loaded from public CDNs on demand (then
+ * persisted through the normal import path so they survive reloads).
+ * Every entry carries its author and license, shown and linked in the
+ * gallery UI: CC-BY-4.0 / CC0 scans and models, plus object scans from
+ * the PlayCanvas engine's example assets (credited to PlayCanvas).
+ * Full credits: docs/SAMPLE-CREDITS.md.
  */
 
 export interface SampleAsset {
@@ -22,6 +24,8 @@ export interface SampleAsset {
   label?: string;
   /** Models: desired largest dimension in meters after import. */
   targetSize?: number;
+  /** Splat objects: uniform scale applied after grounding. */
+  scale?: number;
 }
 
 const ENGINE_SPLATS =
@@ -51,6 +55,45 @@ export const SAMPLE_ASSETS: SampleAsset[] = [
     license: 'CC-BY-4.0',
     sourceUrl: 'https://superspl.at/scene/0ff2e6dc',
     role: 'backdrop',
+  },
+  {
+    kind: 'splat',
+    name: 'Skull',
+    filename: 'skull.sog',
+    url: `${ENGINE_SPLATS}/skull.sog`,
+    sizeMB: 5.4,
+    author: 'PlayCanvas engine examples',
+    license: 'PlayCanvas',
+    sourceUrl: 'https://github.com/playcanvas/engine/tree/main/examples/assets/splats',
+    role: 'object',
+    label: 'skull',
+    scale: 0.25,
+  },
+  {
+    kind: 'splat',
+    name: 'Guitar',
+    filename: 'guitar.compressed.ply',
+    url: `${ENGINE_SPLATS}/guitar.compressed.ply`,
+    sizeMB: 1.5,
+    author: 'PlayCanvas engine examples',
+    license: 'PlayCanvas',
+    sourceUrl: 'https://github.com/playcanvas/engine/tree/main/examples/assets/splats',
+    role: 'object',
+    label: 'guitar',
+    scale: 0.33,
+  },
+  {
+    kind: 'splat',
+    name: 'Biker',
+    filename: 'biker.compressed.ply',
+    url: `${ENGINE_SPLATS}/biker.compressed.ply`,
+    sizeMB: 2.5,
+    author: 'PlayCanvas engine examples',
+    license: 'PlayCanvas',
+    sourceUrl: 'https://github.com/playcanvas/engine/tree/main/examples/assets/splats',
+    role: 'object',
+    label: 'biker',
+    scale: 0.8,
   },
   {
     kind: 'model',

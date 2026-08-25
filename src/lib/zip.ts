@@ -44,6 +44,17 @@ export async function buildZip(entries: ZipEntry[]): Promise<Blob> {
   const localChunks: Uint8Array[] = [];
   const central: Uint8Array[] = [];
 
+  // Real MS-DOS timestamp for every entry. The original app zeroed these
+  // for byte-determinism, but a zero DOS date renders as 1979-11-30 in
+  // file managers and reads as corruption to users.
+  const now = new Date();
+  const dosTime =
+    (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate =
+    ((Math.max(0, now.getFullYear() - 1980)) << 9) |
+    ((now.getMonth() + 1) << 5) |
+    now.getDate();
+
   let offset = 0;
   for (const entry of entries) {
     const nameBytes = enc.encode(entry.name);
@@ -58,8 +69,8 @@ export async function buildZip(entries: ZipEntry[]): Promise<Blob> {
     dv.setUint16(4, 20, true); // version
     dv.setUint16(6, 0, true); // flags
     dv.setUint16(8, 0, true); // method (STORE)
-    dv.setUint16(10, 0, true); // mod time
-    dv.setUint16(12, 0, true); // mod date
+    dv.setUint16(10, dosTime, true); // mod time
+    dv.setUint16(12, dosDate, true); // mod date
     dv.setUint32(14, crc, true);
     dv.setUint32(18, size, true);
     dv.setUint32(22, size, true);
@@ -76,8 +87,8 @@ export async function buildZip(entries: ZipEntry[]): Promise<Blob> {
     cdv.setUint16(6, 20, true); // version needed
     cdv.setUint16(8, 0, true); // flags
     cdv.setUint16(10, 0, true); // method
-    cdv.setUint16(12, 0, true); // time
-    cdv.setUint16(14, 0, true); // date
+    cdv.setUint16(12, dosTime, true); // time
+    cdv.setUint16(14, dosDate, true); // date
     cdv.setUint32(16, crc, true);
     cdv.setUint32(20, size, true);
     cdv.setUint32(24, size, true);

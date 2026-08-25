@@ -142,13 +142,17 @@ export class SelectionController {
 
   private worldAabb(sel: Selection): BoundingBox | null {
     if (sel.kind === 'splat') {
+      const entry = this.splats.entries.find((e) => e.id === sel.id);
       const resource = sel.entity.gsplat?.resource as
         | { aabb?: BoundingBox }
         | null
         | undefined;
-      if (!resource?.aabb) return null;
+      // Outlier-trimmed bounds where available — floaters make the raw
+      // resource AABB useless for hit-testing and selection boxes.
+      const local = (entry ? this.splats.tightLocalAabb(entry) : null) ?? resource?.aabb;
+      if (!local) return null;
       const world = new BoundingBox();
-      world.setFromTransformedAabb(resource.aabb, sel.entity.getWorldTransform());
+      world.setFromTransformedAabb(local, sel.entity.getWorldTransform());
       return world;
     }
     const bounds = computeWorldBounds(sel.entity);

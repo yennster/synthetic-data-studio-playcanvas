@@ -35,7 +35,7 @@ const STATUS_LABEL: Record<string, string> = {
   err: 'Issue',
 };
 
-export function Sidebar() {
+export function Sidebar({ onHide }: { onHide?: () => void }) {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
   const status = useStore((s) => s.status);
@@ -54,7 +54,19 @@ export function Sidebar() {
             <h1>Synthetic Data Studio</h1>
             <p className="tagline">PlayCanvas · Gaussian Splats · Edge Impulse</p>
           </div>
-          <ThemeToggle />
+          <div className="header-buttons">
+            <ThemeToggle />
+            {onHide && (
+              <button
+                className="icon theme-toggle"
+                title="Hide the sidebar (more viewport)"
+                aria-label="Hide sidebar"
+                onClick={onHide}
+              >
+                ⟨
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

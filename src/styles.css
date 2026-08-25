@@ -225,7 +225,7 @@ input[type='password'] {
 .hud {
   position: absolute;
   top: 12px;
-  left: 380px; /* clears the sidebar + its collapse toggle */
+  left: 344px;
   display: flex;
   align-items: flex-start; /* the tip panel must not stretch the pills */
   gap: 6px;
@@ -363,11 +363,17 @@ input[type='password'] {
   flex: 1;
 }
 
+.header-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .sidebar-toggle {
   pointer-events: auto;
   position: absolute;
   top: 12px;
-  left: 344px;
+  left: 12px;
   z-index: 5;
   width: 28px;
   height: 28px;
@@ -375,10 +381,6 @@ input[type='password'] {
   border-radius: 8px;
   font-size: 13px;
   line-height: 1;
-}
-
-.sidebar-hidden .sidebar-toggle {
-  left: 12px;
 }
 
 .sidebar-hidden .hud {

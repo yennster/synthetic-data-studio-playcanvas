@@ -292,6 +292,36 @@ function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
+/** True when a capture is a near-uniform gradient (sky-only shot). */
+async function looksBlank(blob: Blob): Promise<boolean> {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const w = 64;
+    const h = Math.max(1, Math.round((bmp.height / bmp.width) * 64));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const d = ctx.getImageData(0, 0, w, h).data;
+    let sum = 0;
+    let sum2 = 0;
+    const n = d.length / 4;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      sum += lum;
+      sum2 += lum * lum;
+    }
+    const mean = sum / n;
+    const std = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
+    return std < 6;
+  } catch {
+    return false;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Capture                                                             */
 /* ------------------------------------------------------------------ */
@@ -377,6 +407,14 @@ function CaptureCard() {
           ? `Batch stopped — kept ${captured.length}/${total} captures`
           : `Captured ${captured.length} images`
       );
+      // Empty-looking shots usually mean the camera path orbits outside
+      // the scene (e.g. a scan placed before the floor convention).
+      if (captured.length > 0 && (await looksBlank(captured[0].blob))) {
+        setStatus(
+          'err',
+          'Captures look empty — the camera path may be outside your scene. Try “⌖ Ground here” on the backdrop splat, or adjust the path radius/height/target.'
+        );
+      }
       // `?autoUpload=1`: push the batch straight to Edge Impulse.
       if (URL_FLAGS.autoUpload && captured.length > 0) {
         const s = useStore.getState();

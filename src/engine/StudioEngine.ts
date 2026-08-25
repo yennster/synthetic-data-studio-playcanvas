@@ -148,6 +148,16 @@ export class StudioEngine {
     const app = await createApp(canvas);
     const engine = new StudioEngine(app);
     app.start();
+    // Browsers suspend requestAnimationFrame in hidden tabs, which would
+    // freeze asset imports, batch runs, and robot sims mid-flight. Pump
+    // the loop manually (4 Hz) whenever the document is hidden; tick()
+    // has a reentrancy guard, so this is safe alongside live rAF.
+    const pump = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        app.tick(performance.now());
+      }
+    }, 250);
+    app.on('destroy', () => clearInterval(pump));
     return engine;
   }
 
@@ -398,7 +408,11 @@ export class StudioEngine {
     for (const model of this.models.entries) {
       if (!model.entity.enabled) continue;
       const aabb = computeWorldBounds(model.entity);
-      targets.push({ label: model.label, aabbs: [aabb] });
+      targets.push({
+        label: model.label,
+        aabbs: [aabb],
+        worldPoints: this.models.labelSamplePoints(model) ?? undefined,
+      });
     }
     for (const splat of this.splats.entries) {
       if (splat.role !== 'object' || !splat.entity.enabled) continue;
@@ -406,10 +420,29 @@ export class StudioEngine {
         | { aabb?: BoundingBox }
         | null
         | undefined;
-      if (!resource?.aabb) continue;
+      // Prefer the outlier-trimmed bounds — scan floaters inflate the
+      // resource AABB far past the visible object.
+      const local = this.splats.tightLocalAabb(splat) ?? resource?.aabb;
+      if (!local) continue;
       const world = new BoundingBox();
-      world.setFromTransformedAabb(resource.aabb, splat.entity.getWorldTransform());
-      targets.push({ label: splat.label, aabbs: [world] });
+      world.setFromTransformedAabb(local, splat.entity.getWorldTransform());
+      // Tight boxes come from projecting actual splat centers.
+      let worldPoints: Float32Array | undefined;
+      const localSample = this.splats.labelSamplePoints(splat);
+      if (localSample) {
+        worldPoints = new Float32Array(localSample.length);
+        const wt = splat.entity.getWorldTransform();
+        const v = new Vec3();
+        const o = new Vec3();
+        for (let i = 0; i < localSample.length; i += 3) {
+          v.set(localSample[i], localSample[i + 1], localSample[i + 2]);
+          wt.transformPoint(v, o);
+          worldPoints[i] = o.x;
+          worldPoints[i + 1] = o.y;
+          worldPoints[i + 2] = o.z;
+        }
+      }
+      targets.push({ label: splat.label, aabbs: [world], worldPoints });
     }
     return targets;
   }
