@@ -6,6 +6,8 @@ import { SKYBOX_PRESETS, type SkyboxPreset } from '../engine/SkyboxManager';
 import type { CameraTrajectory } from '../lib/types';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
 import { captureSingle, runBatch } from '../modes/visionRunner';
+import { uploadCaptures } from '../lib/edgeImpulse';
+import { URL_FLAGS } from '../lib/urlParams';
 import {
   CollapsibleCard,
   NumberField,
@@ -375,6 +377,40 @@ function CaptureCard() {
           ? `Batch stopped — kept ${captured.length}/${total} captures`
           : `Captured ${captured.length} images`
       );
+      // `?autoUpload=1`: push the batch straight to Edge Impulse.
+      if (URL_FLAGS.autoUpload && captured.length > 0) {
+        const s = useStore.getState();
+        if (s.ei.apiKey) {
+          setStatus('busy', 'Auto-uploading to Edge Impulse…');
+          const realism = s.realism;
+          const result = await uploadCaptures(
+            s.ei,
+            captured,
+            s.mode === 'anomaly' ? s.anomalyLabel : s.ei.label,
+            s.mode === 'detection',
+            (p) => setStatus('busy', `Uploading ${p.done}/${p.total}…`),
+            {
+              mode: s.mode,
+              realism_mode: realism.mode,
+              realism_intensity:
+                realism.mode === 'off'
+                  ? 0
+                  : (realism.grain +
+                      realism.chromatic +
+                      realism.vignette +
+                      realism.jitter +
+                      realism.jpeg) /
+                    5,
+            }
+          );
+          setStatus(
+            result.failed === 0 ? 'ok' : 'err',
+            result.failed === 0
+              ? `Auto-uploaded ${result.done} images`
+              : `${result.done} ok / ${result.failed} failed: ${result.lastError ?? ''}`
+          );
+        }
+      }
     } catch (e) {
       setStatus('err', `Batch failed: ${(e as Error).message}`);
     } finally {

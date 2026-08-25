@@ -4,7 +4,7 @@
  * from App before the engine mounts.
  */
 
-import { URL_PRESETS } from './urlParams';
+import { URL_FLAGS, URL_PRESETS } from './urlParams';
 import {
   applyApiKeyFromUrl,
   applyEiCategoryFromUrl,
@@ -18,6 +18,21 @@ let applied = false;
 export function applyUrlPresets(): void {
   if (applied || typeof window === 'undefined') return;
   applied = true;
+
+  // `?clearStore=1`: wipe persistence, then reload without the flag so
+  // the store rehydrates from a clean slate.
+  if (URL_FLAGS.clearStore) {
+    localStorage.clear();
+    try {
+      indexedDB.deleteDatabase('sds-pc-assets');
+    } catch {
+      // best effort
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('clearStore');
+    window.location.replace(url.toString());
+    return;
+  }
 
   const search = window.location.search;
   const store = useStore.getState();

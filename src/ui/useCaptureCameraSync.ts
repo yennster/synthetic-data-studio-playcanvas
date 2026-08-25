@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useEngine } from '../engine/EngineContext';
 import { useStore } from '../store/useStore';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
+import { URL_FLAGS } from '../lib/urlParams';
 
 /** PiP preview width in CSS pixels (fixed; height follows capture aspect). */
 export const PIP_WIDTH = 240;
@@ -120,7 +121,8 @@ export function useCaptureCameraSync(): void {
   useEffect(() => {
     if (!engine) return;
     engine.gizmos.setState({
-      visible: mode === 'detection' || mode === 'anomaly',
+      // `?gizmos=0` scrubs editor chrome from the live view (embeds).
+      visible: (mode === 'detection' || mode === 'anomaly') && URL_FLAGS.gizmos,
       camPos,
       camTarget,
       fov,

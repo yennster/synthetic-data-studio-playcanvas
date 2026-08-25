@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { useStore, type Mode } from '../store/useStore';
+import { URL_PRESETS } from '../lib/urlParams';
 import { SampleGallery } from './SampleGallery';
 import { SplatLibrary } from './SplatLibrary';
 import { ModelLibrary } from './ModelLibrary';
@@ -15,12 +16,17 @@ const RobotPanel = lazy(() =>
   import('./RobotPanel').then((m) => ({ default: m.RobotPanel }))
 );
 
-const MODES: { value: Mode; label: string; hint: string }[] = [
+const ALL_MODES: { value: Mode; label: string; hint: string }[] = [
   { value: 'detection', label: 'Object detection', hint: 'Images + bboxes' },
   { value: 'anomaly', label: 'Visual anomaly', hint: 'Images, batch label' },
   { value: 'motion', label: 'Motion', hint: 'Accelerometer' },
   { value: 'robot', label: 'Robotics', hint: 'Rover & Arm telemetry' },
 ];
+
+// `?onlyMode=detection` (csv) locks the picker down for deep links.
+const MODES = URL_PRESETS.onlyMode?.length
+  ? ALL_MODES.filter((m) => URL_PRESETS.onlyMode!.includes(m.value))
+  : ALL_MODES;
 
 const STATUS_LABEL: Record<string, string> = {
   idle: 'Status',
