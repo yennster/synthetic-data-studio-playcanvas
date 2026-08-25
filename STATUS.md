@@ -84,6 +84,17 @@ deployment history, build wasm, retrain, job polling), in-browser WASM inference
 **Platform** — dark/light theme, URL presets (`?mode= ?seed= ?camera= ?apiKey=` etc.),
 embed/minimal chrome flags, localStorage persistence (v1), hidden-tab-safe capture.
 
+## Capture-pipeline root cause (session 2, from a user batch zip)
+
+Blank/degraded batch frames traced to: CaptureRig disabled its camera after each
+capture, and the unified gsplat director destroys a disabled camera's manager —
+every capture rebuilt the splat work buffer + async sort worker from scratch with
+the mesh hidden until the first sort returned. Fixed: the capture camera stays
+enabled once used, and captures wait on the full sort/stream settle predicate
+(engine frame:ready condition + sortNeeded/jobsInFlight/hasPendingSort/version
+equality/buffer uploads). Verified: alternating-pose captures are byte-identical.
+Aids that remain useful: '⌖ Ground here', blank-batch warning, real zip timestamps.
+
 ## Adversarial review (done end of session 1)
 
 A 5-dimension review workflow (EI wire formats / capture / React-store lifecycle / engine
