@@ -57,11 +57,16 @@ export function SampleGallery() {
     }
   };
 
-  const renderGroup = (kind: 'splat' | 'model', title: string) => (
+  // Group by FUNCTION, not file format: scans used as backdrops are
+  // environments; splat object scans sit beside the GLB props.
+  const renderGroup = (
+    title: string,
+    filter: (s: SampleAsset) => boolean
+  ) => (
     <div className="gallery-group">
       <h3>{title}</h3>
       <ul className="gallery-list">
-        {SAMPLE_ASSETS.filter((s) => s.kind === kind).map((sample) => {
+        {SAMPLE_ASSETS.filter(filter).map((sample) => {
           const count = matches(sample).length;
           const busy = loading !== null;
           return (
@@ -118,8 +123,8 @@ export function SampleGallery() {
         Photoreal splat scans to use as capture environments, and props to
         detect (or convert to splats). Downloads once, then persists.
       </p>
-      {renderGroup('splat', 'Splat environments')}
-      {renderGroup('model', 'Props (GLB)')}
+      {renderGroup('Environments (splat scans)', (s) => s.kind === 'splat' && s.role === 'backdrop')}
+      {renderGroup('Props', (s) => s.kind === 'model' || (s.kind === 'splat' && s.role === 'object'))}
     </CollapsibleCard>
   );
 }
