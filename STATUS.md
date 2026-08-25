@@ -40,6 +40,16 @@ creation/editing** for hyper-realistic synthetic data. Repo:
   browser, key `sds-welcome-choice`)
 - HUD controls-help `?` pill; overflow/flex fixes; ModelManager gained
   setTransform/duplicate/normalizeSize; SplatManager gained setTransform
+- **Direct manipulation**: SelectionController — click-select any prop/object/splat-object
+  (yellow AABB + shortcut chip), drag to move, Shift=height, Alt=rotate, Cmd/Ctrl=scale,
+  Esc deselects; trajectory path grabbable in the viewport; "Lock camera to path" + phase
+  scrub; Capture card redesigned (chips/sections); sidebar collapse toggle; first-load
+  yes/no prompt for the Apartment scan; URL flags wired (onlyMode/gizmos/clearStore/
+  autoUpload) + docs/url-parameters.md
+- **Open**: curated hyperreal splat OBJECT scans — no verified-license CC source found
+  (engine's skull/guitar/biker lack license files; superspl.at has no stable asset URLs;
+  Poly Haven has no splat category). Users can import their own Polycam/Luma/SuperSplat
+  exports; revisit when a licensed object-scan library appears
 
 ## Working today (all verified in-browser this session)
 
