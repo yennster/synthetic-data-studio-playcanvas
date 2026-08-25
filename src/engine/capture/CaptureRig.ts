@@ -101,6 +101,85 @@ export class CaptureRig {
   }
 
   /**
+   * True when the unified gsplat system has finished sorting and
+   * uploading for THIS capture camera. Each camera gets its own
+   * GSplatManager (director.camerasMap) whose sort runs in an async
+   * worker — capturing right after a camera teleport renders splats
+   * missing or garbled until the round-trip completes. Internal engine
+   * state, accessed defensively.
+   */
+  private splatsReady(): boolean {
+    const director = (
+      this.app as unknown as {
+        renderer?: { gsplatDirector?: { camerasMap?: Map<unknown, unknown> } };
+      }
+    ).renderer?.gsplatDirector;
+    const map = director?.camerasMap;
+    if (!map) return true; // unified system not active — nothing to wait on
+    if (map.size === 0) return true; // no gsplats in the scene
+    const camData = map.get(
+      (this.cameraEntity.camera as unknown as { camera: unknown }).camera
+    ) as { layersMap?: Map<unknown, unknown> } | undefined;
+    // Splats exist but this camera has no manager yet: it must render a
+    // frame first so the director creates one.
+    if (!camData?.layersMap) return false;
+    for (const layerData of camData.layersMap.values()) {
+      const m = (layerData as { gsplatManager?: {
+        sortNeeded?: boolean;
+        hasPendingSort?: boolean;
+        bufferCopyUploaded?: number;
+        bufferCopyTotal?: number;
+        cpuSorter?: { jobsInFlight?: number };
+        world?: {
+          currentVersion?: number;
+          lastWorldStateVersion?: number;
+          awaitingLodUpdate?: boolean;
+          pendingLoadCount?: number;
+          getState?(v: number): { sortedBefore?: boolean } | null;
+        };
+      } }).gsplatManager;
+      if (!m) continue;
+      // A sort is scheduled, in the worker, or returned-but-unapplied.
+      if (m.sortNeeded) return false;
+      if ((m.cpuSorter?.jobsInFlight ?? 0) > 0) return false;
+      if (m.hasPendingSort) return false;
+      // Work-buffer uploads still streaming in.
+      if (
+        typeof m.bufferCopyUploaded === 'number' &&
+        typeof m.bufferCopyTotal === 'number' &&
+        m.bufferCopyUploaded !== m.bufferCopyTotal
+      ) {
+        return false;
+      }
+      const world = m.world;
+      if (world) {
+        // The engine's own frame:ready condition: newest world state is
+        // the rendered one and LOD/streaming has settled.
+        if (
+          typeof world.currentVersion === 'number' &&
+          typeof world.lastWorldStateVersion === 'number' &&
+          world.currentVersion !== world.lastWorldStateVersion
+        ) {
+          return false;
+        }
+        if (world.awaitingLodUpdate) return false;
+        if ((world.pendingLoadCount ?? 0) > 0) return false;
+        const state = world.getState?.(world.currentVersion ?? 0);
+        if (state && state.sortedBefore === false) return false;
+      }
+    }
+    return true;
+  }
+
+  /** Ticks frames until the splat sorter settles (bounded). */
+  private async waitForSplats(maxFrames = 45): Promise<void> {
+    for (let i = 0; i < maxFrames; i++) {
+      if (this.splatsReady()) return;
+      await this.nextFrame();
+    }
+  }
+
+  /**
    * Waits for the next frame to fully render (frameend). Browsers suspend
    * requestAnimationFrame in hidden tabs, which would stall batch capture
    * runs — so when no frame arrives we drive the app loop manually.
@@ -156,10 +235,19 @@ export class CaptureRig {
         this.setFov(pose.fov);
       }
       this.ensureTarget(width, height);
+      // The camera STAYS enabled once used: the gsplat director destroys
+      // a disabled camera's manager (work buffer + sort worker), so
+      // toggling per capture forced a from-scratch rebuild every shot —
+      // with the splat mesh hidden until the first sort returned, most
+      // rapid-fire batch frames rendered without splats.
       this.cameraEntity.enabled = true;
 
-      // Two frames: one so transforms/sorting settle, one to render.
+      // Frame 1 registers the (re)posed camera with the gsplat director
+      // and dispatches its sort; wait until sorting/uploads settle for
+      // this pose; one more frame applies the sorted order before the
+      // frame we read back.
       await this.nextFrame();
+      await this.waitForSplats();
       await this.nextFrame();
 
       // Boxes from the same camera pose the pixels were rendered with.
@@ -175,8 +263,6 @@ export class CaptureRig {
         // frame loop — captures are occasional and must work in hidden tabs.
         immediate: true,
       })) as Uint8Array;
-
-      this.cameraEntity.enabled = false;
 
       // Flip vertically (GL bottom-left origin) into ImageData.
       const flipped = new Uint8ClampedArray(w * h * 4);
@@ -209,7 +295,7 @@ export class CaptureRig {
       );
       return { blob, boxes, width, height };
     } finally {
-      this.cameraEntity.enabled = false;
+      // Deliberately NOT disabling the camera — see the note above.
       this.capturing = false;
     }
   }
