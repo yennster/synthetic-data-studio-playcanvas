@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { useStore, type Mode } from '../store/useStore';
+import { SampleGallery } from './SampleGallery';
 import { SplatLibrary } from './SplatLibrary';
 import { ModelLibrary } from './ModelLibrary';
 import { ThemeToggle } from './ThemeToggle';
@@ -69,6 +70,7 @@ export function Sidebar() {
         <p className="mode-hint">{MODES.find((m) => m.value === mode)?.hint}</p>
       </section>
 
+      <SampleGallery />
       <SplatLibrary />
       <ModelLibrary />
 

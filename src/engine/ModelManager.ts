@@ -133,6 +133,31 @@ export class ModelManager {
     }
   }
 
+  /**
+   * Scales the model so its largest dimension is `targetSize` meters and
+   * re-rests it on the ground centered at the origin — sample props ship
+   * at wildly different authored scales (a 2 m helmet, a 6 cm avocado).
+   */
+  normalizeSize(id: string, targetSize: number): void {
+    const entry = this.entries.find((e) => e.id === id);
+    if (!entry) return;
+    const bounds = computeWorldBounds(entry.entity);
+    const maxDim = 2 * Math.max(bounds.halfExtents.x, bounds.halfExtents.y, bounds.halfExtents.z);
+    if (maxDim <= 0) return;
+    const k = targetSize / maxDim;
+    const s = entry.entity.getLocalScale();
+    entry.entity.setLocalScale(s.x * k, s.y * k, s.z * k);
+    const scaled = computeWorldBounds(entry.entity);
+    const pos = entry.entity.getLocalPosition();
+    entry.entity.setLocalPosition(
+      pos.x - scaled.center.x,
+      pos.y - scaled.center.y + scaled.halfExtents.y,
+      pos.z - scaled.center.z
+    );
+    entry.bounds = computeWorldBounds(entry.entity);
+    this.emit();
+  }
+
   /** Shows/hides a model (e.g. hidden behind its splat conversion). Emits
    * so persistence snapshots capture the visibility change. */
   setEnabled(id: string, enabled: boolean): void {
