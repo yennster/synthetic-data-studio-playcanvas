@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useEngine } from '../engine/EngineContext';
 import { useStore } from '../store/useStore';
+import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
 
 /** PiP preview width in CSS pixels (fixed; height follows capture aspect). */
 export const PIP_WIDTH = 240;
@@ -59,6 +60,44 @@ export function useCaptureCameraSync(): void {
   const trajectoryRadius = useStore((s) => s.capture.trajectoryRadius);
   const trajectoryHeight = useStore((s) => s.capture.trajectoryHeight);
   const batchCount = useStore((s) => s.capture.batchCount);
+  const lockToTrajectory = useStore((s) => s.capture.lockToTrajectory);
+  const trajectoryPhase = useStore((s) => s.capture.trajectoryPhase);
+
+  // Lock mode: the capture camera rides the trajectory scaffold. Any
+  // change to the path (or the phase slider) re-derives camPos, so the
+  // camera, its gizmo, and captures all stay pinned to the path.
+  useEffect(() => {
+    if (!lockToTrajectory || trajectory === 'random') return;
+    const SEGMENTS = 512;
+    const p = sampleCameraTrajectory({
+      trajectory,
+      index: Math.round(trajectoryPhase * SEGMENTS),
+      total: SEGMENTS,
+      target: camTarget,
+      radius: trajectoryRadius,
+      height: trajectoryHeight,
+    });
+    const next: [number, number, number] = [
+      Math.round(p[0] * 100) / 100,
+      Math.round(p[1] * 100) / 100,
+      Math.round(p[2] * 100) / 100,
+    ];
+    const cur = useStore.getState().capture.camPos;
+    if (
+      Math.abs(cur[0] - next[0]) > 1e-6 ||
+      Math.abs(cur[1] - next[1]) > 1e-6 ||
+      Math.abs(cur[2] - next[2]) > 1e-6
+    ) {
+      useStore.getState().setCapture({ camPos: next });
+    }
+  }, [
+    lockToTrajectory,
+    trajectory,
+    trajectoryPhase,
+    camTarget,
+    trajectoryRadius,
+    trajectoryHeight,
+  ]);
 
   // Gizmo handles are draggable in the viewport — write drags back to
   // the store (rounded so the number fields stay readable).

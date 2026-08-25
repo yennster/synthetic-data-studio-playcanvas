@@ -382,9 +382,33 @@ function CaptureCard() {
     }
   };
 
+  const randomizeChips: {
+    key: 'randomizeCamera' | 'randomizeLighting' | 'randomizeObjects';
+    label: string;
+    hint: string;
+    disabled?: boolean;
+  }[] = [
+    {
+      key: 'randomizeCamera',
+      label: 'Camera',
+      hint: 'Jitter the camera around its base pose per shot. Only applies on the Random path — deterministic paths place the camera exactly.',
+      disabled: capture.cameraTrajectory !== 'random',
+    },
+    {
+      key: 'randomizeLighting',
+      label: 'Lighting',
+      hint: 'Jitter the key light intensity per shot.',
+    },
+    {
+      key: 'randomizeObjects',
+      label: 'Objects',
+      hint: 'Nudge spawned object positions and yaw per shot (restored after the batch).',
+    },
+  ];
+
   return (
     <CollapsibleCard heading="Capture">
-      <div className="vision-stack">
+      <div className="vision-stack capture-card">
         {mode === 'anomaly' && (
           <label className="vision-field">
             Batch label
@@ -396,75 +420,72 @@ function CaptureCard() {
             />
           </label>
         )}
-        <button
-          className="primary"
-          onClick={onCapture}
-          disabled={!engine || busy || running}
-        >
-          📸 Capture frame
-        </button>
 
-        <div className="capture-topline">
-          <NumberField
-            label="Batch count"
-            value={capture.batchCount}
-            min={1}
-            max={500}
-            step={1}
-            onChange={(n) => setCapture({ batchCount: n })}
-          />
+        <div className="capture-actions">
+          <button
+            className="primary capture-main-btn"
+            onClick={onCapture}
+            disabled={!engine || busy || running}
+          >
+            📸 Capture
+          </button>
           {running ? (
-            <button className="danger" onClick={() => (cancelRef.current = true)}>
+            <button
+              className="danger capture-main-btn"
+              onClick={() => (cancelRef.current = true)}
+            >
               ■ Stop
             </button>
           ) : (
-            <button className="primary" onClick={onBatch} disabled={!engine || busy}>
-              ⚡ Batch ({capture.batchCount})
+            <button
+              className="capture-main-btn"
+              onClick={onBatch}
+              disabled={!engine || busy}
+              title={`Capture ${capture.batchCount} frames along the path / with jitter`}
+            >
+              ⚡ Batch × {capture.batchCount}
             </button>
           )}
         </div>
 
-        <fieldset className="capture-randomize">
-          <legend>Randomize</legend>
-          <label
-            className={`vision-check${
-              capture.cameraTrajectory !== 'random' ? ' disabled' : ''
-            }`}
-            title="Jitter the camera around its base pose per shot. Only applies on the Random trajectory — deterministic paths place the camera exactly."
-          >
-            <input
-              type="checkbox"
-              checked={capture.randomizeCamera}
-              disabled={capture.cameraTrajectory !== 'random'}
-              onChange={(e) => setCapture({ randomizeCamera: e.target.checked })}
+        <div className="capture-section">
+          <div className="capture-section-head">
+            <span>Batch</span>
+          </div>
+          <div className="capture-batch-row">
+            <NumberField
+              label="Frames"
+              value={capture.batchCount}
+              min={1}
+              max={500}
+              step={1}
+              onChange={(n) => setCapture({ batchCount: n })}
             />
-            <span>Camera</span>
-          </label>
-          <label className="vision-check" title="Jitter the key light intensity per shot.">
-            <input
-              type="checkbox"
-              checked={capture.randomizeLighting}
-              onChange={(e) => setCapture({ randomizeLighting: e.target.checked })}
-            />
-            <span>Lighting</span>
-          </label>
-          <label
-            className="vision-check"
-            title="Nudge spawned object positions and yaw per shot (restored after the batch)."
-          >
-            <input
-              type="checkbox"
-              checked={capture.randomizeObjects}
-              onChange={(e) => setCapture({ randomizeObjects: e.target.checked })}
-            />
-            <span>Objects</span>
-          </label>
-        </fieldset>
+            <div className="capture-chiprow" role="group" aria-label="Randomize per shot">
+              <span className="capture-chiplabel">Randomize</span>
+              {randomizeChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  className={`capture-chip${capture[chip.key] && !chip.disabled ? ' on' : ''}`}
+                  aria-pressed={capture[chip.key] && !chip.disabled}
+                  disabled={chip.disabled}
+                  title={chip.hint}
+                  onClick={() => setCapture({ [chip.key]: !capture[chip.key] })}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
-        <label className="vision-field">
-          Camera trajectory
+        <div className="capture-section">
+          <div className="capture-section-head">
+            <span>Camera path</span>
+          </div>
           <select
             value={capture.cameraTrajectory}
+            aria-label="Camera trajectory"
             onChange={(e) => {
               const next = e.target.value as CameraTrajectory;
               // Snap camPos onto the path's first sample so the preview
@@ -483,32 +504,57 @@ function CaptureCard() {
               </option>
             ))}
           </select>
-        </label>
-        {capture.cameraTrajectory !== 'random' && (
-          <div className="vision-row">
-            <SliderRow
-              label="Radius"
-              value={capture.trajectoryRadius}
-              min={0.5}
-              max={15}
-              step={0.1}
-              formatValue={(v) => `${v.toFixed(1)} m`}
-              onChange={(r) => snap({ trajectoryRadius: r })}
-            />
-            <SliderRow
-              label="Height"
-              value={capture.trajectoryHeight}
-              min={0}
-              max={10}
-              step={0.1}
-              formatValue={(v) => `${v.toFixed(1)} m`}
-              onChange={(h) => snap({ trajectoryHeight: h })}
-            />
-          </div>
-        )}
+          {capture.cameraTrajectory !== 'random' && (
+            <>
+              <SliderRow
+                label="Radius"
+                value={capture.trajectoryRadius}
+                min={0.5}
+                max={15}
+                step={0.1}
+                formatValue={(v) => `${v.toFixed(1)} m`}
+                onChange={(r) => snap({ trajectoryRadius: r })}
+              />
+              <SliderRow
+                label="Height"
+                value={capture.trajectoryHeight}
+                min={0}
+                max={10}
+                step={0.1}
+                formatValue={(v) => `${v.toFixed(1)} m`}
+                onChange={(h) => snap({ trajectoryHeight: h })}
+              />
+              <ToggleSwitch
+                title="Lock camera to path"
+                help={
+                  capture.lockToTrajectory
+                    ? 'The capture camera rides the teal path — scrub its position below. You can also drag the path itself in the viewport.'
+                    : 'Pin the capture camera onto the path; the phase slider then scrubs it along.'
+                }
+                on={capture.lockToTrajectory}
+                onChange={(on) => setCapture({ lockToTrajectory: on })}
+              />
+              {capture.lockToTrajectory && (
+                <SliderRow
+                  label="Path position"
+                  value={capture.trajectoryPhase}
+                  min={0}
+                  max={1}
+                  step={0.005}
+                  formatValue={(v) => `${Math.round(v * 100)}%`}
+                  onChange={(v) => setCapture({ trajectoryPhase: v })}
+                />
+              )}
+            </>
+          )}
+        </div>
 
         <div className="capture-footer">
-          <span>{captures.length} captures</span>
+          <span className="capture-count">
+            {captures.length === 0
+              ? 'No captures yet'
+              : `${captures.length} capture${captures.length === 1 ? '' : 's'} ready`}
+          </span>
           <button onClick={clearCaptures} disabled={captures.length === 0}>
             Clear
           </button>

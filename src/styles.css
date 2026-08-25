@@ -225,7 +225,7 @@ input[type='password'] {
 .hud {
   position: absolute;
   top: 12px;
-  left: 344px;
+  left: 380px; /* clears the sidebar + its collapse toggle */
   display: flex;
   align-items: flex-start; /* the tip panel must not stretch the pills */
   gap: 6px;
@@ -347,10 +347,43 @@ input[type='password'] {
   align-items: stretch;
 }
 
+.splat-row-name {
+  display: block;
+  width: 100%;
+}
+
 .splat-row-main {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+}
+
+.splat-row-spacer {
+  flex: 1;
+}
+
+.sidebar-toggle {
+  pointer-events: auto;
+  position: absolute;
+  top: 12px;
+  left: 344px;
+  z-index: 5;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.sidebar-hidden .sidebar-toggle {
+  left: 12px;
+}
+
+.sidebar-hidden .hud {
+  left: 52px;
+  max-width: calc(100% - 320px);
 }
 
 .splat-row-edit {
@@ -430,4 +463,41 @@ input[type='password'] {
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.5;
+}
+
+.selection-chip {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  background: var(--panel);
+  border: 1px solid #f5d94a;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 11px;
+  backdrop-filter: blur(8px);
+  max-width: 420px;
+}
+
+.selection-chip-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.selection-chip-kind {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.selection-chip p {
+  color: var(--text-dim);
+}
+
+.selection-chip p strong {
+  color: var(--text);
 }

@@ -135,6 +135,15 @@ export class ObjectManager {
     return targets;
   }
 
+  /** Selectable entries for viewport click-manipulation. */
+  getSelectables(): { id: string; entity: Entity; label: string }[] {
+    return [...this.managed.entries()].map(([id, m]) => ({
+      id,
+      entity: m.entity,
+      label: m.obj.label,
+    }));
+  }
+
   /** Jitters object positions for domain randomization; returns undo data. */
   getPositions(): Map<string, Vec3> {
     const map = new Map<string, Vec3>();

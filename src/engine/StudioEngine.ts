@@ -27,6 +27,8 @@ import { SplatManager } from './splats/SplatManager';
 import { SplatEditor } from './splats/SplatEditor';
 import { SkyboxManager } from './SkyboxManager';
 import { GizmoRenderer } from './GizmoRenderer';
+import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
+import { SelectionController } from './SelectionController';
 import { CaptureRig } from './capture/CaptureRig';
 import type { LabelTarget } from './capture/projectBoxes';
 
@@ -48,6 +50,7 @@ export class StudioEngine {
   splatEditor: SplatEditor;
   skybox: SkyboxManager;
   gizmos: GizmoRenderer;
+  selection: SelectionController;
   /** In-canvas picture-in-picture preview of the capture camera. */
   previewCamera: Entity;
   private eraseTarget: { entity: Entity; radius: number } | null = null;
@@ -58,12 +61,13 @@ export class StudioEngine {
   onGizmoHandleDrag: ((handle: 'camera' | 'target', pos: [number, number, number]) => void) | null =
     null;
   private gizmoDrag: {
-    handle: 'camera' | 'target';
+    handle: 'camera' | 'target' | 'trajectory';
     planeY: number;
     startY: number;
     startScreenY: number;
     worldPerPixel: number;
     shift: boolean;
+    grabOffset: [number, number];
   } | null = null;
   private cameraControls: any;
 
@@ -81,8 +85,21 @@ export class StudioEngine {
     this.splatEditor = new SplatEditor(app);
     this.skybox = new SkyboxManager(app);
     this.gizmos = new GizmoRenderer(app);
+    // Registration order matters: camera-gizmo handles get first claim on
+    // a mousedown; the selection controller checks isBlocked before acting.
     this.setupEraseInput();
     this.setupGizmoDrag();
+    this.selection = new SelectionController({
+      app,
+      getViewCamera: () => this.viewCamera,
+      objects: this.objects,
+      models: this.models,
+      splats: this.splats,
+      setOrbitEnabled: (enabled) => {
+        if (this.cameraControls) this.cameraControls.enabled = enabled;
+      },
+    });
+    this.selection.isBlocked = () => this.gizmoDrag !== null || this.eraseTarget !== null;
     // Removing a splat releases its edit processors and drops the brush.
     this.splats.onChange((entries) => {
       const live = new Set(entries.map((e) => e.entity));
@@ -160,11 +177,18 @@ export class StudioEngine {
     const GRAB_PX = 36;
     const screen = new Vec3();
 
-    const handleAt = (x: number, y: number): 'camera' | 'target' | null => {
+    interface Hit {
+      handle: 'camera' | 'target' | 'trajectory';
+      planeY: number;
+      /** Trajectory grabs keep the grabbed path point under the cursor. */
+      grabOffset: [number, number];
+    }
+
+    const handleAt = (x: number, y: number): Hit | null => {
       const state = this.gizmos.currentState();
       if (!state || !state.visible) return null;
       const cam = this.viewCamera.camera!;
-      let best: 'camera' | 'target' | null = null;
+      let best: Hit | null = null;
       let bestDist = GRAB_PX;
       for (const [handle, p] of [
         ['camera', state.camPos],
@@ -175,7 +199,35 @@ export class StudioEngine {
         const d = Math.hypot(screen.x - x, screen.y - y);
         if (d < bestDist) {
           bestDist = d;
-          best = handle;
+          best = { handle, planeY: p[1], grabOffset: [0, 0] };
+        }
+      }
+      if (best) return best;
+
+      // The trajectory path itself is grabbable: dragging it moves the
+      // whole scaffold (its center is the camera target).
+      if (state.trajectory !== 'random') {
+        let ringDist = 18;
+        for (let i = 0; i <= 64; i++) {
+          const p = sampleCameraTrajectory({
+            trajectory: state.trajectory,
+            index: i,
+            total: 64,
+            target: state.camTarget,
+            radius: state.trajectoryRadius,
+            height: state.trajectoryHeight,
+          });
+          cam.worldToScreen(new Vec3(p[0], p[1], p[2]), screen);
+          if (screen.z <= 0) continue;
+          const d = Math.hypot(screen.x - x, screen.y - y);
+          if (d < ringDist) {
+            ringDist = d;
+            best = {
+              handle: 'trajectory',
+              planeY: p[1],
+              grabOffset: [p[0] - state.camTarget[0], p[2] - state.camTarget[2]],
+            };
+          }
         }
       }
       return best;
@@ -198,23 +250,24 @@ export class StudioEngine {
 
     mouse.on(EVENT_MOUSEDOWN, (e: { button: number; x: number; y: number; event: MouseEvent }) => {
       if (e.button !== 0 || this.eraseTarget) return;
-      const handle = handleAt(e.x, e.y);
-      if (!handle) return;
+      const hit = handleAt(e.x, e.y);
+      if (!hit) return;
       const state = this.gizmos.currentState()!;
-      const p = handle === 'camera' ? state.camPos : state.camTarget;
+      const p = hit.handle === 'camera' ? state.camPos : state.camTarget;
       const cam = this.viewCamera.camera!;
       const eye = this.viewCamera.getPosition();
       const dist = Math.hypot(p[0] - eye.x, p[1] - eye.y, p[2] - eye.z);
       const canvas = this.app.graphicsDevice.canvas as HTMLCanvasElement;
       this.gizmoDrag = {
-        handle,
-        planeY: p[1],
+        handle: hit.handle,
+        planeY: hit.planeY,
         startY: p[1],
         startScreenY: e.y,
         worldPerPixel:
           (2 * dist * Math.tan((cam.fov * Math.PI) / 360)) /
           Math.max(1, canvas.clientHeight),
         shift: e.event?.shiftKey ?? false,
+        grabOffset: hit.grabOffset,
       };
       if (this.cameraControls) this.cameraControls.enabled = false;
     });
@@ -224,16 +277,22 @@ export class StudioEngine {
       if (!drag) return;
       const state = this.gizmos.currentState();
       if (!state) return;
-      const p = drag.handle === 'camera' ? state.camPos : state.camTarget;
+      // Trajectory grabs move the scaffold's center — the camera target.
+      const logical = drag.handle === 'camera' ? 'camera' : 'target';
+      const p = logical === 'camera' ? state.camPos : state.camTarget;
       const shift = e.event?.shiftKey ?? drag.shift;
       if (shift) {
         const newY = drag.startY + (drag.startScreenY - e.y) * drag.worldPerPixel;
-        this.onGizmoHandleDrag?.(drag.handle, [p[0], newY, p[2]]);
-        drag.planeY = newY;
+        this.onGizmoHandleDrag?.(logical, [p[0], newY, p[2]]);
+        if (drag.handle !== 'trajectory') drag.planeY = newY;
       } else {
         const point = planePoint(e.x, e.y, drag.planeY);
         if (point) {
-          this.onGizmoHandleDrag?.(drag.handle, [point.x, drag.planeY, point.z]);
+          this.onGizmoHandleDrag?.(logical, [
+            point.x - drag.grabOffset[0],
+            p[1],
+            point.z - drag.grabOffset[1],
+          ]);
         }
       }
     });
@@ -357,6 +416,7 @@ export class StudioEngine {
 
   destroy(): void {
     this.picker?.destroy();
+    this.selection.destroy();
     this.gizmos.destroy();
     this.skybox.destroy();
     this.splatEditor.destroy();

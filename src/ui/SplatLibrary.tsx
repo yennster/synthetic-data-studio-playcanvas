@@ -110,12 +110,13 @@ export function SplatLibrary() {
       <ul className="asset-list">
         {splats.map((entry) => (
           <li key={entry.id} className="splat-row">
+            <span className="asset-name splat-row-name" title={`${entry.name} — ${entry.splatCount} splats`}>
+              {entry.name}
+            </span>
             <div className="splat-row-main">
-              <span className="asset-name" title={`${entry.splatCount} splats`}>
-                {entry.name}
-              </span>
               <select
                 value={entry.role}
+                aria-label={`${entry.name} role`}
                 onChange={(e) =>
                   engine?.splats.setRole(entry.id, e.target.value as 'backdrop' | 'object')
                 }
@@ -123,14 +124,15 @@ export function SplatLibrary() {
                 <option value="backdrop">backdrop</option>
                 <option value="object">object</option>
               </select>
+              <span className="splat-row-spacer" />
               <button
                 className={`icon${erasingId === entry.id ? ' primary' : ''}`}
-                title="Erase brush: right-drag in the scene to erase splats"
+                title="Edit: move / erase brush (right-drag in the scene)"
                 onClick={() =>
                   setErasingId(erasingId === entry.id ? null : entry.id)
                 }
               >
-                ✏
+                ⛭
               </button>
               {entry.points && (
                 <button
@@ -146,7 +148,11 @@ export function SplatLibrary() {
                   ⤓
                 </button>
               )}
-              <button className="icon" onClick={() => engine?.splats.remove(entry.id)}>
+              <button
+                className="icon"
+                title="Remove"
+                onClick={() => engine?.splats.remove(entry.id)}
+              >
                 ✕
               </button>
             </div>

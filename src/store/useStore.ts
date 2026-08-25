@@ -84,6 +84,10 @@ export interface CaptureSettings {
   cameraTrajectory: CameraTrajectory;
   trajectoryRadius: number;
   trajectoryHeight: number;
+  /** Pin the capture camera onto the trajectory path. */
+  lockToTrajectory: boolean;
+  /** Where along the path the locked camera sits (0..1). */
+  trajectoryPhase: number;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -101,6 +105,8 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   cameraTrajectory: 'random',
   trajectoryRadius: 4,
   trajectoryHeight: 2,
+  lockToTrajectory: false,
+  trajectoryPhase: 0,
 };
 
 export type RealismMode = 'off' | 'random' | 'diffusion';

@@ -5,11 +5,14 @@ import { URL_FLAGS } from '../lib/urlParams';
 const TIP_KEY = 'sds-hud-tip-open';
 
 const CONTROLS: [string, string][] = [
+  ['Click an object', 'select it (yellow box)'],
+  ['Drag selected', 'move · ⇧ height · ⌥ rotate · ⌘/Ctrl scale'],
+  ['Esc / click empty', 'deselect'],
   ['Left-drag', 'orbit the camera'],
   ['Middle-drag / Shift+drag', 'pan'],
   ['Scroll', 'zoom'],
+  ['Drag orange/pink handles', 'move the capture camera / its target'],
   ['Right-drag', 'erase splats (when the ✏ brush is on)'],
-  ['⛭ in a model row', 'move / rotate / resize / copy props'],
 ];
 
 /** Dismissable viewport-controls help; open state persists. */
