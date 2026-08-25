@@ -7,7 +7,7 @@
 > Original app's behavior contract: [docs/ORIGINAL-FEATURES.md](docs/ORIGINAL-FEATURES.md).
 > Parity tracking: [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md).
 
-**Last updated:** 2026-08-20 (end of session 1)
+**Last updated:** 2026-08-25 (session 2)
 
 ## What this project is
 
@@ -16,8 +16,30 @@ A ground-up reimplementation of [yennster/synthetic-data-studio](https://github.
 creation/editing** for hyper-realistic synthetic data. Repo:
 `github.com/yennster/synthetic-data-studio-playcanvas` (private).
 
+- **Deployed: <https://canvas.jennyspeelman.dev>** (Vercel project
+  `synthetic-data-studio-playcanvas`, GitHub-connected + `vercel deploy --prod` from the CLI).
 - Engine: `playcanvas` **2.21.4** (npm), TypeScript, Vite, React, zustand.
 - `npm run dev` → http://localhost:5173. `npx vitest run` → 399 tests. `npx tsc -b` clean. CI on push.
+
+## Session 2 (2026-08-25): samples, UX from live feedback, deploy
+
+- **Sample gallery** with +/− copy counters: Apartment + Community Hall splat scans (CC-BY-4.0,
+  credits shown/linked) and Damaged Helmet / Avocado / Water Bottle / Lantern GLBs (CC-BY/CC0),
+  streamed from public CDNs then persisted via the normal import path
+- **World convention: scan floor = y 0.** Backdrop placement estimates the floor
+  (5th-percentile world-Y near the scan's robust median center) so props/primitives rest ON
+  splat floors; `robustSplatCenterWorld` in src/engine/splats/splatPlacement.ts
+- **Transforms everywhere** (user feedback): models (move/rotate/resize/copy ⛭ panel),
+  spawned objects (position/rotation fields), splats (move/rotate/scale in edit panel)
+- **Draggable capture-camera gizmo**: frustum + grab octahedron + pink target cross + teal
+  trajectory path; plane drag / Shift-height; Immediate layer excluded from capture & preview
+  cameras (verified zero gizmo pixels in captures); "🎯 Use current view" button
+- **Procedural skyboxes** (day/sunset/overcast/night) w/ IBL for props — Scene card select,
+  persisted; sky verified through scan gaps
+- **First-load prompt** (yes/no) offers the Apartment scan as default environment (once per
+  browser, key `sds-welcome-choice`)
+- HUD controls-help `?` pill; overflow/flex fixes; ModelManager gained
+  setTransform/duplicate/normalizeSize; SplatManager gained setTransform
 
 ## Working today (all verified in-browser this session)
 
