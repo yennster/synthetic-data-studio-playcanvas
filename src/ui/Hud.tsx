@@ -1,5 +1,55 @@
+import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { URL_FLAGS } from '../lib/urlParams';
+
+const TIP_KEY = 'sds-hud-tip-open';
+
+const CONTROLS: [string, string][] = [
+  ['Left-drag', 'orbit the camera'],
+  ['Middle-drag / Shift+drag', 'pan'],
+  ['Scroll', 'zoom'],
+  ['Right-drag', 'erase splats (when the ✏ brush is on)'],
+  ['⛭ in a model row', 'move / rotate / resize / copy props'],
+];
+
+/** Dismissable viewport-controls help; open state persists. */
+function TipPill() {
+  const [open, setOpen] = useState(
+    () => localStorage.getItem(TIP_KEY) === '1'
+  );
+  const toggle = (next: boolean) => {
+    setOpen(next);
+    localStorage.setItem(TIP_KEY, next ? '1' : '0');
+  };
+  if (!open) {
+    return (
+      <button
+        className="hud-pill hud-tip-toggle"
+        title="Viewport controls"
+        onClick={() => toggle(true)}
+      >
+        ?
+      </button>
+    );
+  }
+  return (
+    <div className="hud-tip">
+      <div className="hud-tip-head">
+        <span>Controls</span>
+        <button className="icon" aria-label="Hide controls help" onClick={() => toggle(false)}>
+          ✕
+        </button>
+      </div>
+      <ul>
+        {CONTROLS.map(([key, what]) => (
+          <li key={key}>
+            <strong>{key}</strong> {what}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const MODE_LABEL: Record<string, string> = {
   detection: 'object detection',
@@ -38,6 +88,7 @@ export function Hud() {
           Captures: {captureCount}
         </span>
       )}
+      <TipPill />
     </div>
   );
 }

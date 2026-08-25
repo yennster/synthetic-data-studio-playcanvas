@@ -1,5 +1,10 @@
 import { Asset, BoundingBox, Entity, Vec3, type AppBase } from 'playcanvas';
-import { deleteAssetBlob, putAssetBlob, MODEL_STORE } from '../lib/assetStore';
+import {
+  deleteAssetBlob,
+  getAssetBlob,
+  putAssetBlob,
+  MODEL_STORE,
+} from '../lib/assetStore';
 
 export type ModelSource =
   | { kind: 'file'; filename: string }
@@ -156,6 +161,81 @@ export class ModelManager {
     );
     entry.bounds = computeWorldBounds(entry.entity);
     this.emit();
+  }
+
+  /**
+   * Moves/rotates/scales a model from the UI. Emits so persistence
+   * snapshots capture the new transform.
+   */
+  setTransform(
+    id: string,
+    patch: { position?: [number, number, number]; yawDeg?: number; scale?: number }
+  ): void {
+    const entry = this.entries.find((e) => e.id === id);
+    if (!entry) return;
+    if (patch.position) {
+      entry.entity.setLocalPosition(...patch.position);
+    }
+    if (patch.yawDeg !== undefined) {
+      const e = entry.entity.getLocalEulerAngles();
+      entry.entity.setLocalEulerAngles(e.x, patch.yawDeg, e.z);
+    }
+    if (patch.scale !== undefined && patch.scale > 0) {
+      entry.entity.setLocalScale(patch.scale, patch.scale, patch.scale);
+    }
+    entry.bounds = computeWorldBounds(entry.entity);
+    this.emit();
+  }
+
+  /**
+   * Adds another copy of an imported model: a fresh render instance of
+   * the same asset, offset beside the source, sharing the label. The
+   * source blob is copied in IndexedDB under the new id so both copies
+   * survive reloads independently.
+   */
+  duplicate(id: string): ModelEntry | null {
+    const source = this.entries.find((e) => e.id === id);
+    if (!source) return null;
+    const resource = source.asset.resource as {
+      instantiateRenderEntity(): Entity;
+    } | null;
+    if (!resource) return null;
+
+    const copies = this.entries.filter(
+      (e) => e.name === source.name || e.name.startsWith(`${source.name} (`)
+    ).length;
+    const entity = resource.instantiateRenderEntity();
+    entity.name = `${source.name} (${copies + 1})`;
+    this.parent.addChild(entity);
+
+    // Match the source's scale/rotation; step position on a small grid so
+    // copies land beside each other instead of z-fighting.
+    const s = source.entity.getLocalScale();
+    entity.setLocalScale(s.x, s.y, s.z);
+    const e = source.entity.getLocalEulerAngles();
+    entity.setLocalEulerAngles(e.x, e.y, e.z);
+    const p = source.entity.getLocalPosition();
+    entity.setLocalPosition(
+      p.x + 0.5 * (copies % 3 === 0 ? 1 : copies % 3 === 1 ? -1 : 0),
+      p.y,
+      p.z + (copies % 2 === 0 ? 0.5 : -0.5)
+    );
+
+    const entry: ModelEntry = {
+      id: crypto.randomUUID(),
+      name: entity.name,
+      entity,
+      asset: source.asset,
+      source: source.source,
+      label: source.label,
+      bounds: computeWorldBounds(entity),
+    };
+    this.entries.push(entry);
+    void getAssetBlob(MODEL_STORE, source.id)
+      .then((blob) => (blob ? putAssetBlob(MODEL_STORE, entry.id, blob) : undefined))
+      .catch((err) => console.warn('model copy persist failed', err));
+    this.emit();
+    return entry;
   }
 
   /** Shows/hides a model (e.g. hidden behind its splat conversion). Emits

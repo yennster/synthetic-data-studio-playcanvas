@@ -40,6 +40,19 @@
   white-space: nowrap;
 }
 
+.gallery-counter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gallery-count {
+  min-width: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .gallery-credit {
   display: block;
   font-size: 10px;

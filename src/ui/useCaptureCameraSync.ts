@@ -55,6 +55,56 @@ export function useCaptureCameraSync(): void {
   const lightIntensity = useStore((s) => s.capture.lightIntensity);
   const width = useStore((s) => s.capture.width);
   const height = useStore((s) => s.capture.height);
+  const trajectory = useStore((s) => s.capture.cameraTrajectory);
+  const trajectoryRadius = useStore((s) => s.capture.trajectoryRadius);
+  const trajectoryHeight = useStore((s) => s.capture.trajectoryHeight);
+  const batchCount = useStore((s) => s.capture.batchCount);
+
+  // Gizmo handles are draggable in the viewport — write drags back to
+  // the store (rounded so the number fields stay readable).
+  useEffect(() => {
+    if (!engine) return;
+    const r = (v: number) => Math.round(v * 100) / 100;
+    engine.onGizmoHandleDrag = (handle, pos) => {
+      const value: [number, number, number] = [r(pos[0]), r(pos[1]), r(pos[2])];
+      useStore
+        .getState()
+        .setCapture(handle === 'camera' ? { camPos: value } : { camTarget: value });
+    };
+    return () => {
+      engine.onGizmoHandleDrag = null;
+    };
+  }, [engine]);
+
+  // Editor gizmos: capture-camera frustum, target marker, trajectory path.
+  // Visible in the vision modes only; never rendered by capture cameras.
+  useEffect(() => {
+    if (!engine) return;
+    engine.gizmos.setState({
+      visible: mode === 'detection' || mode === 'anomaly',
+      camPos,
+      camTarget,
+      fov,
+      aspect: width / Math.max(1, height),
+      trajectory,
+      trajectoryRadius,
+      trajectoryHeight,
+      batchCount,
+    });
+    return () => engine.gizmos.setState(null);
+  }, [
+    engine,
+    mode,
+    camPos,
+    camTarget,
+    fov,
+    width,
+    height,
+    trajectory,
+    trajectoryRadius,
+    trajectoryHeight,
+    batchCount,
+  ]);
 
   useEffect(() => {
     // `mode` is a dep so returning from robot mode (whose POV drive moved

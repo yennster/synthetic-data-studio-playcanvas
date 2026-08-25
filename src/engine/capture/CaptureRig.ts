@@ -1,6 +1,9 @@
 import {
   Color,
   Entity,
+  LAYERID_DEPTH,
+  LAYERID_SKYBOX,
+  LAYERID_WORLD,
   Mat4,
   PIXELFORMAT_RGBA8,
   RenderTarget,
@@ -53,6 +56,8 @@ export class CaptureRig {
       clearColor: new Color(0.08, 0.09, 0.11),
       toneMapping: TONEMAP_ACES,
       priority: -1, // render before the main view
+      // No Immediate layer: editor gizmos must never reach training images.
+      layers: [LAYERID_WORLD, LAYERID_DEPTH, LAYERID_SKYBOX],
     });
     this.cameraEntity.enabled = false;
     app.root.addChild(this.cameraEntity);

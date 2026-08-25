@@ -237,6 +237,62 @@ function SceneObjectRow({
           />
         </div>
       </label>
+      <div className="vision-field">
+        Position X / Z{obj.physics ? '' : ' / Y'}
+        <div className="so-size-row">
+          <NumberField
+            value={obj.position[0]}
+            step={0.1}
+            min={-30}
+            max={30}
+            disabled={disabled}
+            aria-label={`${obj.label} X`}
+            onChange={(n) =>
+              onUpdate({ position: [n, obj.position[1], obj.position[2]] })
+            }
+          />
+          <NumberField
+            value={obj.position[2]}
+            step={0.1}
+            min={-30}
+            max={30}
+            disabled={disabled}
+            aria-label={`${obj.label} Z`}
+            onChange={(n) =>
+              onUpdate({ position: [obj.position[0], obj.position[1], n] })
+            }
+          />
+          {!obj.physics && (
+            <NumberField
+              value={obj.position[1]}
+              step={0.1}
+              min={-10}
+              max={30}
+              disabled={disabled}
+              aria-label={`${obj.label} Y`}
+              onChange={(n) =>
+                onUpdate({ position: [obj.position[0], n, obj.position[2]] })
+              }
+            />
+          )}
+        </div>
+      </div>
+      <label className="vision-field">
+        Rotate {Math.round((obj.rotation * 180) / Math.PI)}°
+        <input
+          type="range"
+          className="vision-range"
+          min={-180}
+          max={180}
+          step={1}
+          value={(obj.rotation * 180) / Math.PI}
+          onChange={(e) =>
+            onUpdate({ rotation: (Number(e.target.value) * Math.PI) / 180 })
+          }
+          disabled={disabled}
+          aria-label={`${obj.label} rotation`}
+        />
+      </label>
       <label className={`vision-check${disabled ? ' disabled' : ''}`}>
         <input
           type="checkbox"
@@ -244,7 +300,7 @@ function SceneObjectRow({
           onChange={(e) => onUpdate({ physics: e.target.checked })}
           disabled={disabled}
         />
-        <span>Physics (falls, collides)</span>
+        <span>Physics (rests on the ground)</span>
       </label>
     </div>
   );

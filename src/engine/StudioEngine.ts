@@ -2,6 +2,9 @@ import {
   BoundingBox,
   Color,
   Entity,
+  LAYERID_DEPTH,
+  LAYERID_SKYBOX,
+  LAYERID_WORLD,
   EVENT_MOUSEDOWN,
   EVENT_MOUSEMOVE,
   EVENT_MOUSEUP,
@@ -22,6 +25,8 @@ import { ModelManager, computeWorldBounds } from './ModelManager';
 import { ObjectManager } from './ObjectManager';
 import { SplatManager } from './splats/SplatManager';
 import { SplatEditor } from './splats/SplatEditor';
+import { SkyboxManager } from './SkyboxManager';
+import { GizmoRenderer } from './GizmoRenderer';
 import { CaptureRig } from './capture/CaptureRig';
 import type { LabelTarget } from './capture/projectBoxes';
 
@@ -41,12 +46,25 @@ export class StudioEngine {
   objects: ObjectManager;
   capture: CaptureRig;
   splatEditor: SplatEditor;
+  skybox: SkyboxManager;
+  gizmos: GizmoRenderer;
   /** In-canvas picture-in-picture preview of the capture camera. */
   previewCamera: Entity;
   private eraseTarget: { entity: Entity; radius: number } | null = null;
   private erasing = false;
   private picker: Picker | null = null;
   private pickerDirty = true;
+  /** Set by the UI layer: receives gizmo-handle drag updates. */
+  onGizmoHandleDrag: ((handle: 'camera' | 'target', pos: [number, number, number]) => void) | null =
+    null;
+  private gizmoDrag: {
+    handle: 'camera' | 'target';
+    planeY: number;
+    startY: number;
+    startScreenY: number;
+    worldPerPixel: number;
+    shift: boolean;
+  } | null = null;
   private cameraControls: any;
 
   private constructor(app: AppBase) {
@@ -61,7 +79,10 @@ export class StudioEngine {
     this.objects = new ObjectManager(app, this.content);
     this.capture = new CaptureRig(app);
     this.splatEditor = new SplatEditor(app);
+    this.skybox = new SkyboxManager(app);
+    this.gizmos = new GizmoRenderer(app);
     this.setupEraseInput();
+    this.setupGizmoDrag();
     // Removing a splat releases its edit processors and drops the brush.
     this.splats.onChange((entries) => {
       const live = new Set(entries.map((e) => e.entity));
@@ -81,6 +102,8 @@ export class StudioEngine {
       toneMapping: TONEMAP_ACES,
       priority: 1, // render the PiP after the main view
       rect: new Vec4(0.02, 0.02, 0.25, 0.25),
+      // No Immediate layer: the PiP shows what a capture would, gizmo-free.
+      layers: [LAYERID_WORLD, LAYERID_DEPTH, LAYERID_SKYBOX],
     });
     this.previewCamera.enabled = false;
     app.root.addChild(this.previewCamera);
@@ -123,6 +146,104 @@ export class StudioEngine {
     this.eraseTarget = entity ? { entity, radius } : null;
     this.erasing = false;
     if (entity) this.app.mouse?.disableContextMenu();
+  }
+
+  /**
+   * Direct manipulation of the capture-camera gizmo: left-drag near the
+   * frustum origin moves the camera, near the pink cross moves the
+   * target. Dragging is horizontal at the handle's height; hold Shift to
+   * raise/lower instead. Orbit input pauses during the drag.
+   */
+  private setupGizmoDrag(): void {
+    const mouse = this.app.mouse;
+    if (!mouse) return;
+    const GRAB_PX = 36;
+    const screen = new Vec3();
+
+    const handleAt = (x: number, y: number): 'camera' | 'target' | null => {
+      const state = this.gizmos.currentState();
+      if (!state || !state.visible) return null;
+      const cam = this.viewCamera.camera!;
+      let best: 'camera' | 'target' | null = null;
+      let bestDist = GRAB_PX;
+      for (const [handle, p] of [
+        ['camera', state.camPos],
+        ['target', state.camTarget],
+      ] as const) {
+        cam.worldToScreen(new Vec3(p[0], p[1], p[2]), screen);
+        if (screen.z < 0) continue; // behind the view
+        const d = Math.hypot(screen.x - x, screen.y - y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = handle;
+        }
+      }
+      return best;
+    };
+
+    const planePoint = (x: number, y: number, planeY: number): Vec3 | null => {
+      const cam = this.viewCamera.camera!;
+      const near = cam.screenToWorld(x, y, cam.nearClip);
+      const far = cam.screenToWorld(x, y, cam.farClip);
+      const dy = far.y - near.y;
+      if (Math.abs(dy) < 1e-6) return null;
+      const t = (planeY - near.y) / dy;
+      if (t < 0 || t > 1) return null;
+      return new Vec3(
+        near.x + (far.x - near.x) * t,
+        planeY,
+        near.z + (far.z - near.z) * t
+      );
+    };
+
+    mouse.on(EVENT_MOUSEDOWN, (e: { button: number; x: number; y: number; event: MouseEvent }) => {
+      if (e.button !== 0 || this.eraseTarget) return;
+      const handle = handleAt(e.x, e.y);
+      if (!handle) return;
+      const state = this.gizmos.currentState()!;
+      const p = handle === 'camera' ? state.camPos : state.camTarget;
+      const cam = this.viewCamera.camera!;
+      const eye = this.viewCamera.getPosition();
+      const dist = Math.hypot(p[0] - eye.x, p[1] - eye.y, p[2] - eye.z);
+      const canvas = this.app.graphicsDevice.canvas as HTMLCanvasElement;
+      this.gizmoDrag = {
+        handle,
+        planeY: p[1],
+        startY: p[1],
+        startScreenY: e.y,
+        worldPerPixel:
+          (2 * dist * Math.tan((cam.fov * Math.PI) / 360)) /
+          Math.max(1, canvas.clientHeight),
+        shift: e.event?.shiftKey ?? false,
+      };
+      if (this.cameraControls) this.cameraControls.enabled = false;
+    });
+
+    mouse.on(EVENT_MOUSEMOVE, (e: { x: number; y: number; event: MouseEvent }) => {
+      const drag = this.gizmoDrag;
+      if (!drag) return;
+      const state = this.gizmos.currentState();
+      if (!state) return;
+      const p = drag.handle === 'camera' ? state.camPos : state.camTarget;
+      const shift = e.event?.shiftKey ?? drag.shift;
+      if (shift) {
+        const newY = drag.startY + (drag.startScreenY - e.y) * drag.worldPerPixel;
+        this.onGizmoHandleDrag?.(drag.handle, [p[0], newY, p[2]]);
+        drag.planeY = newY;
+      } else {
+        const point = planePoint(e.x, e.y, drag.planeY);
+        if (point) {
+          this.onGizmoHandleDrag?.(drag.handle, [point.x, drag.planeY, point.z]);
+        }
+      }
+    });
+
+    mouse.on(EVENT_MOUSEUP, (e: { button: number }) => {
+      if (e.button === 0 && this.gizmoDrag) {
+        this.gizmoDrag = null;
+        if (this.cameraControls) this.cameraControls.enabled = true;
+      }
+    });
   }
 
   private setupEraseInput(): void {
@@ -236,6 +357,8 @@ export class StudioEngine {
 
   destroy(): void {
     this.picker?.destroy();
+    this.gizmos.destroy();
+    this.skybox.destroy();
     this.splatEditor.destroy();
     this.capture.destroy();
     this.objects.destroy();

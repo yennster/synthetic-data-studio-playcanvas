@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEngine } from '../engine/EngineContext';
 import { useStore } from '../store/useStore';
-import { isSplatFilename, SPLAT_EXTENSIONS } from '../engine/splats/SplatManager';
+import {
+  isSplatFilename,
+  SPLAT_EXTENSIONS,
+  type SplatEntry,
+} from '../engine/splats/SplatManager';
 import { pointsToPly } from '../engine/splats/splatExport';
 import { saveBlob } from '../lib/captureFormats';
+import { NumberField, SliderRow } from './primitives';
 
 /**
  * Splat library card: import scans, create primitives, manage roles/labels.
@@ -147,6 +152,7 @@ export function SplatLibrary() {
             </div>
             {erasingId === entry.id && (
               <div className="splat-row-edit">
+                <SplatTransformControls entry={entry} />
                 <label>
                   Brush {brushRadius.toFixed(2)} m
                   <input
@@ -174,5 +180,53 @@ export function SplatLibrary() {
         {splats.length === 0 && <li className="empty">No splats yet</li>}
       </ul>
     </section>
+  );
+}
+
+/** Move / rotate / scale controls for one splat entry. */
+function SplatTransformControls({ entry }: { entry: SplatEntry }) {
+  const engine = useEngine();
+  const [, setTick] = useState(0);
+  const pos = entry.entity.getLocalPosition();
+  const yaw = entry.entity.getLocalEulerAngles().y;
+  const scale = entry.entity.getLocalScale().x;
+  const move = (axis: 0 | 1 | 2, value: number) => {
+    const p: [number, number, number] = [pos.x, pos.y, pos.z];
+    p[axis] = value;
+    engine?.splats.setTransform(entry.id, { position: p });
+    setTick((t) => t + 1);
+  };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  return (
+    <>
+      <div className="splat-move-row">
+        <NumberField label="X" value={r2(pos.x)} min={-50} max={50} step={0.1} onChange={(v) => move(0, v)} />
+        <NumberField label="Y" value={r2(pos.y)} min={-50} max={50} step={0.1} onChange={(v) => move(1, v)} />
+        <NumberField label="Z" value={r2(pos.z)} min={-50} max={50} step={0.1} onChange={(v) => move(2, v)} />
+      </div>
+      <SliderRow
+        label="Rotate"
+        value={yaw}
+        min={-180}
+        max={180}
+        step={1}
+        formatValue={(v) => `${Math.round(v)}°`}
+        onChange={(v) => {
+          engine?.splats.setTransform(entry.id, { yawDeg: v });
+          setTick((t) => t + 1);
+        }}
+      />
+      <SliderRow
+        label="Scale ×"
+        value={scale}
+        min={0.05}
+        max={5}
+        step={0.05}
+        onChange={(v) => {
+          engine?.splats.setTransform(entry.id, { scale: v });
+          setTick((t) => t + 1);
+        }}
+      />
+    </>
   );
 }

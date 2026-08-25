@@ -1,15 +1,9 @@
 import { useState } from 'react';
-import { Vec3 } from 'playcanvas';
 import { useEngine } from '../engine/EngineContext';
-import { centerSplatBackdrop } from '../engine/splats/splatPlacement';
-import { snapshotPendingAssets } from '../engine/rehydrateAssets';
 import { useStore } from '../store/useStore';
 import { CollapsibleCard } from './primitives';
-import {
-  fetchSampleFile,
-  SAMPLE_ASSETS,
-  type SampleAsset,
-} from '../lib/sampleAssets';
+import { importSampleAsset } from './sampleImport';
+import { SAMPLE_ASSETS, type SampleAsset } from '../lib/sampleAssets';
 import './gallery.css';
 
 /**
@@ -21,47 +15,44 @@ export function SampleGallery() {
   const engine = useEngine();
   const splats = useStore((s) => s.splats);
   const models = useStore((s) => s.models);
-  const setBusy = useStore((s) => s.setBusy);
   const setStatus = useStore((s) => s.setStatus);
   const [loading, setLoading] = useState<string | null>(null);
 
-  const isLoaded = (sample: SampleAsset) =>
+  const matches = (sample: SampleAsset) =>
     sample.kind === 'splat'
-      ? splats.some((e) => e.name === sample.filename)
-      : models.some((e) => e.name === sample.filename);
+      ? splats.filter((e) => e.name === sample.filename)
+      : models.filter(
+          (e) =>
+            e.name === sample.filename || e.name.startsWith(`${sample.filename} (`)
+        );
+
+  const addCopy = (sample: SampleAsset) => {
+    if (!engine) return;
+    const existing = matches(sample);
+    if (existing.length === 0) {
+      void importSample(sample);
+    } else if (sample.kind === 'model') {
+      engine.models.duplicate(existing[0].id);
+    }
+  };
+
+  const removeCopy = (sample: SampleAsset) => {
+    if (!engine) return;
+    const existing = matches(sample);
+    if (existing.length === 0) return;
+    const last = existing[existing.length - 1];
+    if (sample.kind === 'splat') engine.splats.remove(last.id);
+    else engine.models.remove(last.id);
+  };
 
   const importSample = async (sample: SampleAsset) => {
     if (!engine || loading) return;
     setLoading(sample.name);
     try {
-      const file = await fetchSampleFile(sample, (mb) =>
-        setBusy(`Downloading ${sample.name}… ${mb.toFixed(1)} / ${sample.sizeMB} MB`)
-      );
-      setBusy(`Importing ${sample.name}…`);
-      if (sample.kind === 'splat') {
-        const entry = await engine.splats.importFile(file, sample.role ?? 'backdrop');
-        if (sample.label) engine.splats.setLabel(entry.id, sample.label);
-        if (sample.role === 'backdrop') {
-          // Scans arrive in arbitrary world offsets — bring the scan's
-          // (outlier-robust) center over the origin at a livable height
-          // so the studio camera starts inside the environment.
-          if (centerSplatBackdrop(entry)) {
-            engine.focusOn(new Vec3(0, 1.2, 0));
-            // The import snapshot ran before centering — persist the
-            // corrected transform so reloads restore this placement.
-            snapshotPendingAssets(engine);
-          }
-        }
-      } else {
-        const entry = await engine.models.importFile(file);
-        if (sample.label) engine.models.setLabel(entry.id, sample.label);
-        if (sample.targetSize) engine.models.normalizeSize(entry.id, sample.targetSize);
-      }
-      setStatus('ok', `${sample.name} added (${sample.license} · ${sample.author})`);
+      await importSampleAsset(engine, sample);
     } catch (err) {
       setStatus('err', (err as Error).message);
     } finally {
-      setBusy(null);
       setLoading(null);
     }
   };
@@ -70,32 +61,53 @@ export function SampleGallery() {
     <div className="gallery-group">
       <h3>{title}</h3>
       <ul className="gallery-list">
-        {SAMPLE_ASSETS.filter((s) => s.kind === kind).map((sample) => (
-          <li key={sample.name} className="gallery-row">
-            <div className="gallery-main">
-              <span className="gallery-name">{sample.name}</span>
-              <span className="gallery-size">{sample.sizeMB} MB</span>
-              <button
-                disabled={!engine || loading !== null || isLoaded(sample)}
-                onClick={() => void importSample(sample)}
+        {SAMPLE_ASSETS.filter((s) => s.kind === kind).map((sample) => {
+          const count = matches(sample).length;
+          const busy = loading !== null;
+          return (
+            <li key={sample.name} className="gallery-row">
+              <div className="gallery-main">
+                <span className="gallery-name">{sample.name}</span>
+                <span className="gallery-size">{sample.sizeMB} MB</span>
+                {loading === sample.name ? (
+                  <span className="gallery-size">Loading…</span>
+                ) : (
+                  <span className="gallery-counter">
+                    <button
+                      className="icon"
+                      aria-label={`Remove one ${sample.name}`}
+                      disabled={!engine || busy || count === 0}
+                      onClick={() => removeCopy(sample)}
+                    >
+                      −
+                    </button>
+                    <span className="gallery-count">{count}</span>
+                    <button
+                      className="icon"
+                      aria-label={`Add one ${sample.name}`}
+                      disabled={
+                        !engine ||
+                        busy ||
+                        (sample.kind === 'splat' && count > 0)
+                      }
+                      onClick={() => addCopy(sample)}
+                    >
+                      +
+                    </button>
+                  </span>
+                )}
+              </div>
+              <a
+                className="gallery-credit"
+                href={sample.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
               >
-                {isLoaded(sample)
-                  ? '✓ Added'
-                  : loading === sample.name
-                    ? 'Loading…'
-                    : '+ Add'}
-              </button>
-            </div>
-            <a
-              className="gallery-credit"
-              href={sample.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {sample.license} · {sample.author}
-            </a>
-          </li>
-        ))}
+                {sample.license} · {sample.author}
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

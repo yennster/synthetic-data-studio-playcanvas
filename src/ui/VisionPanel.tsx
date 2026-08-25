@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Color } from 'playcanvas';
 import { useEngine } from '../engine/EngineContext';
 import { useStore, type CaptureSettings } from '../store/useStore';
+import { SKYBOX_PRESETS, type SkyboxPreset } from '../engine/SkyboxManager';
 import type { CameraTrajectory } from '../lib/types';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
 import { captureSingle, runBatch } from '../modes/visionRunner';
@@ -58,6 +59,8 @@ function SceneCard() {
   // ground + light rig is a viewing aid, not captured dataset state.
   const [groundVisible, setGroundVisible] = useState(true);
   const [groundColor, setGroundColor] = useState(DEFAULT_GROUND_COLOR);
+  const skybox = useStore((s) => s.skybox);
+  const setSkybox = useStore((s) => s.setSkybox);
   const [lightPitch, setLightPitch] = useState(50);
   const [lightYaw, setLightYaw] = useState(30);
 
@@ -76,6 +79,20 @@ function SceneCard() {
   return (
     <CollapsibleCard heading="Scene" defaultOpen>
       <div className="vision-stack">
+        <label className="vision-row">
+          <span className="vision-help">Sky</span>
+          <select
+            value={skybox}
+            onChange={(e) => setSkybox(e.target.value as SkyboxPreset)}
+            aria-label="Skybox preset"
+          >
+            {SKYBOX_PRESETS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <ToggleSwitch
           title="Ground plane"
           help={
@@ -154,9 +171,42 @@ function VirtualCameraCard() {
   const capture = useStore((s) => s.capture);
   const setCapture = useStore((s) => s.setCapture);
 
+  const useCurrentView = () => {
+    if (!engine) return;
+    const p = engine.viewCamera.getPosition();
+    const f = engine.viewCamera.forward;
+    // Aim at a point a few meters along the view direction.
+    const d = 3;
+    setCapture({
+      camPos: [round1(p.x), round1(p.y), round1(p.z)],
+      camTarget: [round1(p.x + f.x * d), round1(p.y + f.y * d), round1(p.z + f.z * d)],
+    });
+  };
+
   return (
     <CollapsibleCard heading="Virtual camera">
       <div className="vision-stack">
+        <div className="button-row">
+          <button
+            className="primary"
+            disabled={!engine}
+            title="Snap the capture camera to what you're looking at right now"
+            onClick={useCurrentView}
+          >
+            🎯 Use current view
+          </button>
+          <button
+            disabled={!engine}
+            title="Aim the capture camera back at the scene origin"
+            onClick={() => setCapture({ camTarget: [0, 0.5, 0] })}
+          >
+            Aim at origin
+          </button>
+        </div>
+        <p className="vision-help">
+          The orange frustum in the viewport is this camera; pink cross =
+          its target; teal path = the batch trajectory.
+        </p>
         <div className="vision-row">
           <NumberField
             label="Width"
@@ -213,9 +263,31 @@ function VirtualCameraCard() {
             ))}
           </div>
         </div>
+        <div className="vision-field">
+          Target X / Y / Z
+          <div className="vision-row">
+            {AXES.map((axis, i) => (
+              <NumberField
+                key={axis}
+                value={capture.camTarget[i]}
+                step={0.1}
+                aria-label={`Camera target ${axis}`}
+                onChange={(n) => {
+                  const next = [...capture.camTarget] as [number, number, number];
+                  next[i] = n;
+                  setCapture({ camTarget: next });
+                }}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </CollapsibleCard>
   );
+}
+
+function round1(v: number): number {
+  return Math.round(v * 10) / 10;
 }
 
 /* ------------------------------------------------------------------ */

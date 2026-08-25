@@ -1,10 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { useEngine } from '../engine/EngineContext';
 import { useStore } from '../store/useStore';
-import { isModelFilename, MODEL_EXTENSIONS } from '../engine/ModelManager';
+import { isModelFilename, MODEL_EXTENSIONS, type ModelEntry } from '../engine/ModelManager';
+import { NumberField, SliderRow } from './primitives';
 
 /**
- * Model library card: import GLB props, edit labels, convert to splats.
+ * Model library card: import GLB props, per-copy transform controls
+ * (move / rotate / resize), duplicate, convert to splats, remove.
  */
 export function ModelLibrary() {
   const engine = useEngine();
@@ -12,6 +14,9 @@ export function ModelLibrary() {
   const setBusy = useStore((s) => s.setBusy);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  // Bumped after engine-side transform writes so controls re-read values.
+  const [, setTick] = useState(0);
 
   const importFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -55,6 +60,54 @@ export function ModelLibrary() {
     [engine, setBusy]
   );
 
+  const renderControls = (entry: ModelEntry) => {
+    const pos = entry.entity.getLocalPosition();
+    const yaw = entry.entity.getLocalEulerAngles().y;
+    const scale = entry.entity.getLocalScale().x;
+    const move = (axis: 0 | 1 | 2, value: number) => {
+      const p: [number, number, number] = [pos.x, pos.y, pos.z];
+      p[axis] = value;
+      engine?.models.setTransform(entry.id, { position: p });
+      setTick((t) => t + 1);
+    };
+    return (
+      <div className="model-controls">
+        <div className="model-controls-row">
+          <NumberField label="X" value={round2(pos.x)} min={-30} max={30} step={0.1} onChange={(v) => move(0, v)} />
+          <NumberField label="Y" value={round2(pos.y)} min={-10} max={30} step={0.1} onChange={(v) => move(1, v)} />
+          <NumberField label="Z" value={round2(pos.z)} min={-30} max={30} step={0.1} onChange={(v) => move(2, v)} />
+        </div>
+        <SliderRow
+          label="Rotate"
+          value={yaw}
+          min={-180}
+          max={180}
+          step={1}
+          formatValue={(v) => `${Math.round(v)}°`}
+          onChange={(v) => {
+            engine?.models.setTransform(entry.id, { yawDeg: v });
+            setTick((t) => t + 1);
+          }}
+        />
+        <SliderRow
+          label="Size ×"
+          value={scale}
+          min={0.05}
+          max={5}
+          step={0.05}
+          onChange={(v) => {
+            engine?.models.setTransform(entry.id, { scale: v });
+            setTick((t) => t + 1);
+          }}
+        />
+        <div className="button-row">
+          <button onClick={() => engine?.models.duplicate(entry.id)}>+ Copy</button>
+          <button onClick={() => convertToSplat(entry.id)}>→ splat</button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <section className="card">
       <h2>3D Models</h2>
@@ -85,23 +138,35 @@ export function ModelLibrary() {
       {error && <p className="error">{error}</p>}
       <ul className="asset-list">
         {models.map((entry) => (
-          <li key={entry.id}>
-            <span className="asset-name" title={entry.label}>
-              {entry.name}
-            </span>
-            <button
-              title="Convert to gaussian splat"
-              onClick={() => convertToSplat(entry.id)}
-            >
-              → splat
-            </button>
-            <button className="icon" onClick={() => engine?.models.remove(entry.id)}>
-              ✕
-            </button>
+          <li key={entry.id} className="splat-row">
+            <div className="splat-row-main">
+              <span className="asset-name" title={entry.label}>
+                {entry.name}
+              </span>
+              <button
+                className={`icon${openId === entry.id ? ' primary' : ''}`}
+                title="Move / rotate / resize / copy"
+                onClick={() => setOpenId(openId === entry.id ? null : entry.id)}
+              >
+                ⛭
+              </button>
+              <button
+                className="icon"
+                title="Remove"
+                onClick={() => engine?.models.remove(entry.id)}
+              >
+                ✕
+              </button>
+            </div>
+            {openId === entry.id && renderControls(entry)}
           </li>
         ))}
         {models.length === 0 && <li className="empty">No models yet</li>}
       </ul>
     </section>
   );
+}
+
+function round2(v: number): number {
+  return Math.round(v * 100) / 100;
 }

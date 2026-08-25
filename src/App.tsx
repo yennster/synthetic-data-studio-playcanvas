@@ -2,6 +2,8 @@ import { EngineProvider } from './engine/EngineContext';
 import { Sidebar } from './ui/Sidebar';
 import { Hud } from './ui/Hud';
 import { ThemeSync } from './ui/ThemeSync';
+import { SkyboxSync } from './ui/SkyboxSync';
+import { WelcomePrompt } from './ui/WelcomePrompt';
 import { useCaptureCameraSync } from './ui/useCaptureCameraSync';
 import { useStore } from './store/useStore';
 import { URL_FLAGS } from './lib/urlParams';
@@ -21,10 +23,12 @@ export default function App() {
   return (
     <EngineProvider>
       <ThemeSync />
+      <SkyboxSync />
       <CaptureSync />
       <div className={`ui-overlay${noChrome ? ' no-chrome' : ''}`}>
         {!noChrome && <Sidebar />}
         <Hud />
+        {!noChrome && <WelcomePrompt />}
         {engineStatus === 'booting' && <div className="status-pill">Starting engine…</div>}
         {engineStatus === 'error' && (
           <div className="status-pill error">Engine failed: {engineError}</div>

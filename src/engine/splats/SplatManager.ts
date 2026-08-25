@@ -211,6 +211,27 @@ export class SplatManager {
     return entry;
   }
 
+  /**
+   * Moves/rotates/scales a splat from the UI. Yaw composes with the
+   * import-time 180° Z flip. Emits so persistence snapshots capture it.
+   */
+  setTransform(
+    id: string,
+    patch: { position?: [number, number, number]; yawDeg?: number; scale?: number }
+  ): void {
+    const entry = this.entries.find((e) => e.id === id);
+    if (!entry) return;
+    if (patch.position) entry.entity.setLocalPosition(...patch.position);
+    if (patch.yawDeg !== undefined) {
+      const e = entry.entity.getLocalEulerAngles();
+      entry.entity.setLocalEulerAngles(e.x, patch.yawDeg, e.z);
+    }
+    if (patch.scale !== undefined && patch.scale > 0) {
+      entry.entity.setLocalScale(patch.scale, patch.scale, patch.scale);
+    }
+    this.emit();
+  }
+
   setRole(id: string, role: SplatRole): void {
     const entry = this.entries.find((e) => e.id === id);
     if (entry) {

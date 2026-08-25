@@ -16,8 +16,8 @@
 - [x] `src/engine/createApp.ts`: AppBase bootstrap (GSplat systems, handlers, fill window)
 - [x] Scene environment: ground + two-light rig, theme-aware colors
 - [x] View camera with CameraControls orbit/pan/zoom
-- [ ] Entity selection: click-select, multi-select, drag-move, keyboard shortcuts (original parity)
-- [ ] Capture-camera gizmo (frustum visual on a gizmo-only layer) + orbit-center marker
+- [ ] Entity selection: click-select, multi-select, viewport drag-move of objects (original parity; numeric transforms + gizmo drag exist)
+- [x] Capture-camera gizmo (frustum + target marker + trajectory path on the Immediate layer, excluded from captures) with draggable handles (Shift = height)
 
 ## Phase 2 — Gaussian splats (new headline feature)
 - [x] Import: drag&drop + picker for .ply/.compressed.ply/.sog
@@ -30,7 +30,7 @@
 - [ ] Edit: apply edits destructively + export edited imported scans (needs GPU→CPU readback of streams)
 - [x] Export created splats to 3DGS .ply
 - [x] Persist splats + models in IndexedDB, restore on reload with transforms
-- [ ] Splat transform UI (position/rotation/scale controls per entry)
+- [x] Splat transform UI (position/rotation/scale in the edit panel)
 
 ## Phase 3 — Capture & export pipeline
 - [x] Offscreen 2× SSAA render-target capture, hidden-tab safe

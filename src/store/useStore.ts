@@ -28,6 +28,7 @@ function throttledLocalStorage(delayMs: number): Storage {
   } as Storage;
 }
 import type { SplatEntry } from '../engine/splats/SplatManager';
+import type { SkyboxPreset } from '../engine/SkyboxManager';
 import type { ModelEntry } from '../engine/ModelManager';
 import type {
   AccelSample,
@@ -272,6 +273,9 @@ interface StudioState {
   sceneObjects: SceneObject[];
   selectedIds: string[];
 
+  /** Procedural sky panorama behind splat scans / open scenes. */
+  skybox: SkyboxPreset;
+
   // Vision capture
   capture: CaptureSettings;
   captures: Capture[];
@@ -305,6 +309,7 @@ interface StudioState {
   setStatus(kind: StatusState['kind'], msg: string): void;
   setBusy(message: string | null): void;
   setCardOpen(key: string, open: boolean): void;
+  setSkybox(preset: SkyboxPreset): void;
   setSplats(entries: SplatEntry[]): void;
   setModels(entries: ModelEntry[]): void;
   setPendingSplats(entries: PendingAsset[]): void;
@@ -377,6 +382,7 @@ export const useStore = create<StudioState>()(
       status: { kind: 'idle', msg: '' },
       busyMessage: null,
       cardOpen: {},
+      skybox: 'none',
 
       splats: [],
       models: [],
@@ -422,6 +428,7 @@ export const useStore = create<StudioState>()(
       setBusy: (busyMessage) => set({ busyMessage }),
       setCardOpen: (key, open) =>
         set((s) => ({ cardOpen: { ...s.cardOpen, [key]: open } })),
+      setSkybox: (skybox) => set({ skybox }),
       setSplats: (splats) => set({ splats }),
       setModels: (models) => set({ models }),
       setPendingSplats: (pendingSplats) => set({ pendingSplats }),
@@ -492,6 +499,7 @@ export const useStore = create<StudioState>()(
       partialize: (s) => ({
         theme: s.theme,
         mode: s.mode,
+        skybox: s.skybox,
         cardOpen: s.cardOpen,
         sceneObjects: s.sceneObjects,
         capture: s.capture,
