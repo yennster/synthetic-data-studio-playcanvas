@@ -1,10 +1,24 @@
-import { Asset, BoundingBox, Entity, Vec3, type AppBase } from 'playcanvas';
+import {
+  Asset,
+  BoundingBox,
+  Color,
+  Entity,
+  StandardMaterial,
+  Vec3,
+  type AppBase,
+} from 'playcanvas';
 import {
   deleteAssetBlob,
   getAssetBlob,
   putAssetBlob,
   MODEL_STORE,
 } from '../lib/assetStore';
+import {
+  DEFAULT_MATERIAL_OVERRIDE,
+  mergeMaterialOverride,
+  roughnessToGloss,
+  type MaterialOverride,
+} from '../lib/materialOverride';
 
 export type ModelSource =
   | { kind: 'file'; filename: string }
@@ -20,6 +34,9 @@ export interface ModelEntry {
   label: string;
   /** World-space AABB captured at import (before user transforms). */
   bounds: BoundingBox;
+  /** Material/color override state (the original's "use if it's pink"
+   * rescue) — applied via `setMaterialOverride`, persisted per model. */
+  override: MaterialOverride;
   /** Cached per-mesh vertex samples for tight screen-space label boxes. */
   meshSamples?: { node: { getWorldTransform(): { transformPoint(v: Vec3, o: Vec3): Vec3 } }; positions: Float32Array }[];
 }
@@ -42,6 +59,11 @@ export class ModelManager {
   private parent: Entity;
   private listeners = new Set<Listener>();
   entries: ModelEntry[] = [];
+  /** Per-entry override material (one each so per-copy colors diverge). */
+  private overrideMats = new Map<string, StandardMaterial>();
+  /** Per-entry cache of the mesh instances' original materials, so
+   * toggling the override off restores what the GLB shipped with. */
+  private originalMats = new Map<string, Map<unknown, unknown>>();
 
   constructor(app: AppBase, parent: Entity) {
     this.app = app;
@@ -121,6 +143,7 @@ export class ModelManager {
           source,
           label: defaultLabel(name),
           bounds: computeWorldBounds(entity),
+          override: { ...DEFAULT_MATERIAL_OVERRIDE },
         };
         this.entries.push(entry);
         this.emit();
@@ -137,6 +160,71 @@ export class ModelManager {
     if (entry) {
       entry.label = label;
       this.emit();
+    }
+  }
+
+  /**
+   * Applies / edits / removes the per-model material override: when
+   * enabled, every mesh instance under the entry swaps to one plain
+   * StandardMaterial of the override color (rescues imports whose
+   * materials didn't translate — the flat-pink case); when disabled,
+   * the cached original materials come back. Emits so persistence
+   * snapshots capture the override.
+   */
+  setMaterialOverride(id: string, patch: Partial<MaterialOverride>): void {
+    const entry = this.entries.find((e) => e.id === id);
+    if (!entry) return;
+    entry.override = mergeMaterialOverride(entry.override, patch);
+    this.applyMaterialOverride(entry);
+    this.emit();
+  }
+
+  private meshInstances(entry: ModelEntry): { material: unknown }[] {
+    const out: { material: unknown }[] = [];
+    for (const render of entry.entity.findComponents('render') as any[]) {
+      for (const mi of render.meshInstances ?? []) out.push(mi);
+    }
+    return out;
+  }
+
+  private applyMaterialOverride(entry: ModelEntry): void {
+    const mis = this.meshInstances(entry);
+    if (entry.override.enabled) {
+      let mat = this.overrideMats.get(entry.id);
+      if (!mat) {
+        mat = new StandardMaterial();
+        this.overrideMats.set(entry.id, mat);
+      }
+      mat.diffuse = new Color().fromString(entry.override.color);
+      mat.useMetalness = true;
+      mat.metalness = entry.override.metalness;
+      mat.gloss = roughnessToGloss(entry.override.roughness);
+      mat.update();
+      let originals = this.originalMats.get(entry.id);
+      if (!originals) {
+        originals = new Map();
+        this.originalMats.set(entry.id, originals);
+      }
+      for (const mi of mis) {
+        if (!originals.has(mi)) originals.set(mi, mi.material);
+        mi.material = mat;
+      }
+    } else {
+      const originals = this.originalMats.get(entry.id);
+      if (!originals) return;
+      for (const mi of mis) {
+        const orig = originals.get(mi);
+        if (orig) mi.material = orig;
+      }
+    }
+  }
+
+  private disposeOverride(id: string): void {
+    this.originalMats.delete(id);
+    const mat = this.overrideMats.get(id);
+    if (mat) {
+      mat.destroy();
+      this.overrideMats.delete(id);
     }
   }
 
@@ -231,8 +319,12 @@ export class ModelManager {
       source: source.source,
       label: source.label,
       bounds: computeWorldBounds(entity),
+      // Copies inherit the override values but get their own override
+      // material instance, so later per-copy color edits diverge.
+      override: { ...source.override },
     };
     this.entries.push(entry);
+    if (entry.override.enabled) this.applyMaterialOverride(entry);
     void getAssetBlob(MODEL_STORE, source.id)
       .then((blob) => (blob ? putAssetBlob(MODEL_STORE, entry.id, blob) : undefined))
       .catch((err) => console.warn('model copy persist failed', err));
@@ -303,6 +395,7 @@ export class ModelManager {
     if (index >= 0) {
       const [entry] = this.entries.splice(index, 1);
       entry.entity.destroy();
+      this.disposeOverride(entry.id);
       this.app.assets.remove(entry.asset);
       entry.asset.unload();
       void deleteAssetBlob(MODEL_STORE, entry.id).catch(() => {});
@@ -317,6 +410,7 @@ export class ModelManager {
   destroy(): void {
     for (const entry of this.entries) {
       entry.entity.destroy();
+      this.disposeOverride(entry.id);
       this.app.assets.remove(entry.asset);
       entry.asset.unload();
     }

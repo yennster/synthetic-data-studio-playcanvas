@@ -5,8 +5,9 @@ import { isModelFilename, MODEL_EXTENSIONS, type ModelEntry } from '../engine/Mo
 import { NumberField, SliderRow } from './primitives';
 
 /**
- * Model library card: import GLB props, per-copy transform controls
- * (move / rotate / resize), duplicate, convert to splats, remove.
+ * Model library card: import GLB props, per-copy label + transform
+ * controls (move / rotate / resize), material/color override for
+ * broken-material imports, duplicate, convert to splats, remove.
  */
 export function ModelLibrary() {
   const engine = useEngine();
@@ -70,8 +71,25 @@ export function ModelLibrary() {
       engine?.models.setTransform(entry.id, { position: p });
       setTick((t) => t + 1);
     };
+    const override = entry.override;
+    const setOverride = (
+      patch: Partial<typeof override>
+    ) => {
+      engine?.models.setMaterialOverride(entry.id, patch);
+      setTick((t) => t + 1);
+    };
     return (
       <div className="model-controls">
+        <label className="model-label-field">
+          Label
+          <input
+            type="text"
+            value={entry.label}
+            onChange={(e) => engine?.models.setLabel(entry.id, e.target.value)}
+            aria-label={`${entry.name} label`}
+            title="Bounding-box label used in detection captures"
+          />
+        </label>
         <div className="model-controls-row">
           <NumberField label="X" value={round2(pos.x)} min={-30} max={30} step={0.1} onChange={(v) => move(0, v)} />
           <NumberField label="Y" value={round2(pos.y)} min={-10} max={30} step={0.1} onChange={(v) => move(1, v)} />
@@ -89,17 +107,65 @@ export function ModelLibrary() {
             setTick((t) => t + 1);
           }}
         />
-        <SliderRow
-          label="Size ×"
-          value={scale}
-          min={0.05}
-          max={5}
-          step={0.05}
-          onChange={(v) => {
-            engine?.models.setTransform(entry.id, { scale: v });
-            setTick((t) => t + 1);
-          }}
-        />
+        <div className="model-scale-row">
+          <SliderRow
+            label="Size ×"
+            value={scale}
+            min={0.05}
+            max={5}
+            step={0.05}
+            onChange={(v) => {
+              engine?.models.setTransform(entry.id, { scale: v });
+              setTick((t) => t + 1);
+            }}
+          />
+          <NumberField
+            className="model-scale-number"
+            value={round2(scale)}
+            min={0.05}
+            max={5}
+            step={0.05}
+            aria-label={`${entry.name} size value`}
+            onChange={(v) => {
+              engine?.models.setTransform(entry.id, { scale: v });
+              setTick((t) => t + 1);
+            }}
+          /></div>
+        <label className="model-override-toggle">
+          <input
+            type="checkbox"
+            checked={override.enabled}
+            onChange={(e) => setOverride({ enabled: e.target.checked })}
+          />
+          <span>Override material (use if it&apos;s pink)</span>
+        </label>
+        {override.enabled && (
+          <div className="model-override-row">
+            <input
+              type="color"
+              value={override.color}
+              onChange={(e) => setOverride({ color: e.target.value })}
+              title={`Override color: ${override.color}`}
+              aria-label={`${entry.name} override color`}
+            />
+            <SliderRow
+              label="Rough"
+              value={override.roughness}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(roughness) => setOverride({ roughness })}
+            />
+            <SliderRow
+              label="Metal"
+              value={override.metalness}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(metalness) => setOverride({ metalness })}
+            />
+          </div>
+        )}
         <div className="button-row">
           <button onClick={() => engine?.models.duplicate(entry.id)}>+ Copy</button>
           <button onClick={() => convertToSplat(entry.id)}>→ splat</button>

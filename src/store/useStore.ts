@@ -256,6 +256,13 @@ export interface PendingAsset {
   scale: [number, number, number];
   /** false when hidden (e.g. a mesh replaced by its splat conversion). */
   enabled?: boolean;
+  /** Models only: material/color override ("use if it's pink"). */
+  override?: {
+    enabled: boolean;
+    color: string;
+    roughness: number;
+    metalness: number;
+  };
 }
 
 interface StudioState {

@@ -11,7 +11,8 @@ import {
   type SceneObject,
   type UploadModality,
 } from '../store/useStore';
-import { RoverRig } from '../engine/RoverRig';
+import { RoverRig, ROVER_LIDAR_HEIGHT } from '../engine/RoverRig';
+import { LidarFanRenderer } from '../engine/LidarFanRenderer';
 import { ArmRig, type ArmPovMount } from '../engine/ArmRig';
 import { BRACCIO_LIMITS_RAD, BRACCIO_REST_RAD } from '../lib/braccio';
 import type { BraccioJointVector } from '../lib/braccioIk';
@@ -25,7 +26,8 @@ import {
   type RobotRunProgress,
   type RobotRunTally,
 } from '../modes/robotRunner';
-import type { RoverTick, WorldAabb } from '../modes/roverSim';
+import { makeAabbLidarCaster, type RoverTick, type WorldAabb } from '../modes/roverSim';
+import { scanLidar } from '../lib/lidar';
 import type { ArmPickupTarget, ArmTick } from '../modes/armSim';
 import {
   CollapsibleCard,
@@ -44,6 +46,9 @@ import './robot.css';
 
 /** POV camera field of view (degrees) — matches the original robot POV. */
 const POV_FOV = 70;
+
+/** Live lidar-fan rescan rate, Hz — the original's VISUAL_SCAN_HZ. */
+const LIDAR_VISUAL_SCAN_HZ = 20;
 
 function formatTally(t: RobotRunTally): string {
   return `${t.sensorUploaded} sensor up · ${t.sensorZipped} sensor zip · ${t.imagesUploaded} img up · ${t.imagesZipped} img zip · ${t.failed} failed`;
@@ -312,6 +317,51 @@ export function RobotPanel() {
     return () => {
       armRigRef.current = null;
       rig.destroy();
+    };
+  }, [engine, robot.kind]);
+
+  // Live lidar beam fan: rescan from the rig's current pose against the
+  // rover-owned obstacle field at the sensor's 20 Hz cadence, idle or
+  // mid-run (the runner drives the rig pose; the fan just reads it —
+  // same contract as the original's always-on LidarFan). Draws on the
+  // Immediate layer, so captures and the POV preview never see it.
+  useEffect(() => {
+    if (!engine || robot.kind !== 'rover') return;
+    const fan = new LidarFanRenderer(engine.app);
+    const period = 1 / LIDAR_VISUAL_SCAN_HZ;
+    let accum = period; // scan on the first frame
+    const update = (dt: number) => {
+      accum += dt;
+      if (accum < period) return;
+      accum = 0;
+      const rig = roverRigRef.current;
+      if (!rig) {
+        fan.setState(null);
+        return;
+      }
+      const s = useStore.getState();
+      const castRay = makeAabbLidarCaster(
+        robotObstacleAabbs(s.sceneObjects, 'rover')
+      );
+      const p = rig.root.getPosition();
+      const origin = { x: p.x, y: p.y + ROVER_LIDAR_HEIGHT, z: p.z };
+      fan.setState({
+        origin: [origin.x, origin.y, origin.z],
+        heading: rig.heading,
+        ranges: scanLidar({
+          origin,
+          heading: rig.heading,
+          bins: s.robot.lidarBins,
+          maxRange: s.robot.lidarMaxRange,
+          castRay,
+        }),
+        maxRange: s.robot.lidarMaxRange,
+      });
+    };
+    engine.app.on('update', update);
+    return () => {
+      engine.app.off('update', update);
+      fan.destroy();
     };
   }, [engine, robot.kind]);
 

@@ -441,6 +441,66 @@ input[type='password'] {
   min-width: 0;
 }
 
+.model-scale-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.model-scale-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-scale-row .model-scale-number {
+  flex: none;
+  width: 64px;
+}
+
+.model-label-field {
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.model-override-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.model-override-toggle input[type='checkbox'] {
+  width: auto;
+  flex: none;
+  margin: 0;
+}
+
+.model-override-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-override-row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-override-row input[type='color'] {
+  flex: none;
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: none;
+}
+
 .welcome-prompt {
   position: absolute;
   top: 50%;

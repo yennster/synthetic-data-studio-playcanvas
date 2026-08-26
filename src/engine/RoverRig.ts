@@ -38,10 +38,10 @@ const RAD2DEG = 180 / Math.PI;
  * Purely visual — physics/trajectories live in src/modes/roverSim.ts;
  * the panel forwards the sim's per-tick pose into `setPose`.
  *
- * TODO: live lidar beam-fan visualization (the original drew a
- * LineSegments fan, hidden during POV capture via a hideForCapture
- * flag). Skipped in this pass; when added it should hang off `root`
- * so it inherits the rover pose, and stay out of capture renders.
+ * The live lidar beam fan is NOT part of this rig: it draws through
+ * LidarFanRenderer on the Immediate layer (excluded from capture and
+ * preview cameras — the original's hideForCapture semantics), reading
+ * this rig's pose via `setPose`'s recorded x/z/heading.
  */
 export class RoverRig {
   /** Root entity the panel poses via `setPose`. */
@@ -54,6 +54,7 @@ export class RoverRig {
   private materials: StandardMaterial[] = [];
   private chassisMat: StandardMaterial;
   private inContact = false;
+  private headingRad = 0;
 
   constructor(app: AppBase, parent: Entity) {
     const { chassis, wheelR, wheelT, rideHeight, headSize } = ROVER_RIG_DIMS;
@@ -136,8 +137,15 @@ export class RoverRig {
 
   /** Applies a sim pose: planar position + yaw (radians, 0 = +Z). */
   setPose(x: number, z: number, headingRad: number): void {
+    this.headingRad = headingRad;
     this.root.setLocalPosition(x, 0, z);
     this.root.setLocalEulerAngles(0, headingRad * RAD2DEG, 0);
+  }
+
+  /** Last pose fed to `setPose` — the lidar fan reads the yaw here
+   * (Euler extraction from the entity flips past ±90°). */
+  get heading(): number {
+    return this.headingRad;
   }
 
   /** Tints the chassis while the contact detector reports an obstacle

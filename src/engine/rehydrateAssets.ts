@@ -72,6 +72,10 @@ export async function rehydrateAssets(engine: StudioEngine): Promise<void> {
         const entry = await engine.models.importFile(file, meta.id);
         engine.models.setLabel(entry.id, meta.label);
         applyTransform(entry.entity, meta);
+        // Restore the material/color override before anything renders.
+        if (meta.override) {
+          engine.models.setMaterialOverride(entry.id, meta.override);
+        }
         // A model converted to splats stays hidden behind its splat twin.
         if (meta.enabled === false) entry.entity.enabled = false;
       } catch (err) {
@@ -126,6 +130,7 @@ export function snapshotPendingAssets(engine: StudioEngine): void {
       eulerAngles: vec(e.entity.getLocalEulerAngles()),
       scale: vec(e.entity.getLocalScale()),
       enabled: e.entity.enabled,
+      override: { ...e.override },
     }))
   );
 }
