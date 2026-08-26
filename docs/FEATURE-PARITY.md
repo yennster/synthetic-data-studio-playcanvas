@@ -50,8 +50,8 @@ at all (its only asset import is USDZ, [§4.6](ORIGINAL-FEATURES.md#46-usdz-impo
 | Environment presets (studio/warehouse/whitebox/outdoor) | 2048×1024 canvas skyboxes, per-preset floors, wall colliders (§4.9) | ❌ | `?env=` is parsed (`src/lib/urlParams.ts`) but nothing consumes it; splat backdrops may replace some presets (🔀 candidate) |
 | Custom floor/wall textures (IndexedDB) | Two slots `floor`/`wall`, `sds-textures` db, 4× floor tile, equirect wall (§2.5, §7.2) | ❌ | |
 | Camera rig: orbit controls | OrbitControls damping 0.1, min 0.3/max 20, target [0,0.7,0]; per-mode snap poses (§1.4) | ✅ | `StudioEngine` view camera + `CameraControls` script, double-click `focusOn()` |
-| Virtual capture camera separate from view camera | Dedicated PerspectiveCamera + preview overlay + frustum gizmo (§4.3) | ✅ | `src/engine/capture/CaptureRig.ts` (dedicated offscreen camera) + live in-canvas PiP preview, bottom-right (`src/ui/useCaptureCameraSync.ts`). No frustum gizmo yet (see selection/gizmo rows) |
-| Entity/selection framework | Click select, Cmd/Ctrl multi-select, Esc clear, Shift+drag move w/ depth+wheel, [/] rotate, Q/E orbit, arrow pan (§1.4, §4.10) | ❌ | No click-selection or drag gizmos; transforms are edited via panel number fields instead |
+| Virtual capture camera separate from view camera | Dedicated PerspectiveCamera + preview overlay + frustum gizmo (§4.3) | ✅ | `src/engine/capture/CaptureRig.ts` (dedicated offscreen camera) + live in-canvas PiP preview, bottom-right (`src/ui/useCaptureCameraSync.ts`) + draggable frustum/target/trajectory gizmos with resize handles (`src/engine/GizmoRenderer.ts`) |
+| Entity/selection framework | Click select, Cmd/Ctrl multi-select, Esc clear, Shift+drag move w/ depth+wheel, [/] rotate, Q/E orbit, arrow pan (§1.4, §4.10) | 🚧 | `src/engine/SelectionController.ts` + `src/ui/useSelection.tsx`: click select (yellow box), Esc clear, drag move / ⇧ height / ⌥ rotate / ⌘-scale; `[`/`]` rotate + `-`/`=` scale + F frame via `useKeyboardShortcuts.tsx`; WASD/QE/arrows fly the camera (🔀 richer than Q/E orbit). Cmd/Ctrl multi-select still open |
 | Theme-aware clear color / theme system | `sds-theme` localStorage, pre-paint bootstrap, dark default, theme↔env sync in motion/robot only (§7.6, §1.1) | ✅ | `src/ui/ThemeToggle.tsx` (data-theme on root) + `ThemeSync.tsx` (engine clear color + ground swap). Dark default; persisted inside `sds-pc-store` (🔀 not `sds-theme`, no pre-paint script). Verified in-browser |
 | Shared math helpers | clamp (NaN→lo), lerp, smoothstep, wrapAngle (§1.7) | ✅ | `src/lib/math.ts` + `math.test.ts` |
 | Seeded RNG | mulberry32 via `?seed=`, single shared sequence (§4.8) | ✅ | `src/lib/rng.ts` (`mulberry32`, `rng`/`getRng`, `isSeeded`) + tests |
@@ -87,7 +87,7 @@ Related original feature subsumed here:
 | ZIP reader (EI deployment unpack) | EOCD scan, zip-slip guard, 128/256 MiB caps, deflate-raw (§4.4) | ✅ | `src/lib/zipReader.ts` (+tests): EOCD back-scan, 128 MiB/entry + 256 MiB total caps, STORE + DEFLATE via DecompressionStream |
 | Seeded RNG wiring into capture | Batch jitter, realism, objectCount picks, arm randomize (§4.8) | ✅ | `getRng()`/`rng()` threaded through visionRunner (jitter/lighting/objects), realism, motionRunner, and RobotPanel |
 | Preview overlay + readback | ~15 Hz RT readback, pooled buffers, vertical flip, DPR clamp 2, aspect-locked height (§1.1, §4.5) | 🔀 | Replaced by a live in-canvas PiP viewport (second camera via `StudioEngine.setPreviewRect` + `src/ui/useCaptureCameraSync.ts`, aspect-locked, bottom-right) — no readback loop needed |
-| Gizmo layer exclusion | Gizmos on layer 1; capture camera layer 0; raycaster+camera both enable (§4.3) | ❌ | No gizmos built yet (`?gizmos=` flag parsed but nothing to hide) |
+| Gizmo layer exclusion | Gizmos on layer 1; capture camera layer 0; raycaster+camera both enable (§4.3) | ✅ | Gizmos (capture frustum/target/trajectory, selection box) draw on `LAYERID_IMMEDIATE`, which capture/preview/POV cameras exclude — verified zero gizmo pixels in captures. `?gizmos=0` hides them (`src/ui/useCaptureCameraSync.ts`) |
 
 ## Phase 4 — Edge Impulse
 
@@ -106,14 +106,14 @@ Related original feature subsumed here:
 | Inference card UI | List/build/fetch/file flows, threshold 0.05–0.95, Run once / Live (§2.13) | ✅ | `src/ui/EiInferenceCard.tsx`: deployment-history fetch, build-then-download, load-from-file, threshold slider, Run once / Live |
 | Live inference loop + overlay | 5 Hz throttle, one-shot bypass, box/centroid/heatmap drawing, label hash colors (§3.8) | ✅ | 5 Hz (`INFERENCE_INTERVAL_MS = 200`) in `EiInferenceCard.tsx`; `src/ui/InferenceOverlay.tsx` draws boxes/FOMO centroids/anomaly heatmap with stable label→color hashing |
 | Retrain button flow | Single-project guard, jobs/retrain + poll (§2.4, §2.14) | ✅ | `src/ui/EiUploadCard.tsx` → `retrainEiModel` + `waitForEiJob` |
-| URL auth prefill + autoUpload | ?apiKey, ?category aliases, ?autoUpload post-batch (§3.9) | 🚧 | `?apiKey`/`?category` (+theme) wired via `src/lib/embed.ts` + `applyUrlPresets.ts`; `?autoUpload` parsed (`urlParams.ts`) but not acted on |
+| URL auth prefill + autoUpload | ?apiKey, ?category aliases, ?autoUpload post-batch (§3.9) | ✅ | `?apiKey`/`?category` (+theme) wired via `src/lib/embed.ts` + `applyUrlPresets.ts`; `?autoUpload=1` pushes finished batches straight to EI (`src/ui/VisionPanel.tsx`) |
 
 ## Phase 5 — Modes (parity with original)
 
 | Feature | Original behavior (§ref) | Status | Notes |
 |---|---|---|---|
 | App shell: 4 modes + sidebar + panels | motion/detection/anomaly/robot; lazy panels; mode card + status bar (§1.1, §1.2) | ✅ | `src/App.tsx` + `src/ui/Sidebar.tsx`: 4-mode switcher, lazy panels (React.lazy/Suspense), status bar; fresh visual design (🔀 on looks, parity on capability) |
-| HUD pills + shortcuts tip | Mode/objects/captures pills, REC pill, tip persistence `sds-hud-tip-open` (§1.3) | ✅ | `src/ui/Hud.tsx`: mode/objects/splats/captures pills + REC pill; hidden when `?embed=1`. Shortcuts tip intentionally absent until selection shortcuts exist |
+| HUD pills + shortcuts tip | Mode/objects/captures pills, REC pill, tip persistence `sds-hud-tip-open` (§1.3) | ✅ | `src/ui/Hud.tsx`: mode/objects/splats/captures pills + REC pill; hidden when `?embed=1`. Shortcuts tip: `?`-toggled controls panel (open state persists, `sds-hud-tip-open`) |
 | Object detection mode | Scene card, objects card, virtual camera, capture card, upload (§2.5–2.14) | ✅ | `src/ui/VisionPanel.tsx`: Scene / SceneObjects / VirtualCamera / Realism / Capture / EI auth+inference+upload cards. Verified single + batch in-browser 2026-08-20 |
 | Visual anomaly mode | Batch label, no boxes on upload, bare-PNG singles (§2.11, §4.3) | ✅ | Shares `VisionPanel`; anomaly label, bare-PNG singles, `includeBoxes=false` on upload (`EiUploadCard.tsx`) |
 | Scene objects card (7 primitive kinds) | Spawner/editor, color cycle, physics toggle, owner filtering, belt-safe spawn columns (§2.6) | ✅ | `src/ui/SceneObjectsCard.tsx` + store: all 7 kinds (cube/sphere/cylinder/torus/capsule/phone/soda_can), spawner/editor, owner filtering; physics toggle = instant ground rest (`ObjectManager.ts` — real physics tracked in TODO Phase 5) |
@@ -146,7 +146,7 @@ Related original feature subsumed here:
 | URL params + presets | Full preset/flag table, reject-not-clamp, aliases, applyUrlPresets order (§7.3) | 🚧 | `src/lib/urlParams.ts` parses the full table (+443-line test file); `src/lib/applyUrlPresets.ts` applies mode/theme/apiKey/category/robot/capture/realism/objects/seed. `onlyMode`/`autoUpload`/`armPose`/`bypassAuth`/`env` parsed but not yet wired to behavior |
 | Iframe embed support | Outbound IFRAME_HEIGHT pings, embedOrigin/referrer targeting, embed/ui/gizmos flags (§7.4) | 🚧 | `src/lib/embed.ts` fully ported (+tests): IFRAME_HEIGHT message builders, `resolveEmbedTargetOrigin`, `initPostContentHeight`; `?embed=1`/`?ui=minimal` hide chrome (`App.tsx`/`Hud.tsx`). Height pings not yet called from the shell |
 | Theme toggle (light/dark) | §7.6 | ✅ | See Phase 1 theme row (`ThemeToggle.tsx` + `ThemeSync.tsx`); verified in-browser |
-| clearStore bootstrap | Confirm-gated wipe of exact keys/dbs (§7.8) | ❌ | `?clearStore` flag parsed (`urlParams.ts`) but no wipe implemented |
+| clearStore bootstrap | Confirm-gated wipe of exact keys/dbs (§7.8) | ✅ | `applyUrlPresets.ts`: `?clearStore=1` wipes localStorage + the `sds-pc-assets` IDB, strips the flag, reloads clean (🔀 no confirm dialog — flag is deliberate enough) |
 | Platform detection | UA-based Apple gating (§7.7) | ❌ | |
 | Number-input UX | Draft-tolerant useNumberInput on all numeric fields (§1.5) | ✅ | `src/ui/primitives/NumberField.tsx` (draft-decision helpers unit-tested in `NumberField.test.ts`); used across all panels |
 | Accessibility + reduced motion | WCAG 2.1 AA targets, tabular-nums, prefers-reduced-motion kill-switch (§1.6) | 🚧 | `prefers-reduced-motion` blocks, `tabular-nums`, and `:focus-visible` styles across `src/ui/*.css`; no full AA audit of the fresh design yet |

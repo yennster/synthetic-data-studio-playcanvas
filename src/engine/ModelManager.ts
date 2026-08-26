@@ -396,8 +396,12 @@ export class ModelManager {
       const [entry] = this.entries.splice(index, 1);
       entry.entity.destroy();
       this.disposeOverride(entry.id);
-      this.app.assets.remove(entry.asset);
-      entry.asset.unload();
+      // Duplicates share the source's container asset — unloading it
+      // while a sibling still uses it would strip that copy's meshes.
+      if (!this.entries.some((e) => e.asset === entry.asset)) {
+        this.app.assets.remove(entry.asset);
+        entry.asset.unload();
+      }
       void deleteAssetBlob(MODEL_STORE, entry.id).catch(() => {});
       this.emit();
     }
