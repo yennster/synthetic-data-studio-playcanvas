@@ -3,7 +3,7 @@ import { EngineProvider } from './engine/EngineContext';
 import { Sidebar } from './ui/Sidebar';
 import { Hud } from './ui/Hud';
 import { ThemeSync } from './ui/ThemeSync';
-import { SkyboxSync } from './ui/SkyboxSync';
+import { EnvironmentSync } from './ui/EnvironmentSync';
 import { WelcomePrompt } from './ui/WelcomePrompt';
 import { SelectionChip } from './ui/useSelection';
 import { KeyboardShortcuts } from './ui/useKeyboardShortcuts';
@@ -45,7 +45,7 @@ export default function App() {
   return (
     <EngineProvider>
       <ThemeSync />
-      <SkyboxSync />
+      <EnvironmentSync />
       <CaptureSync />
       <KeyboardShortcuts />
       <div

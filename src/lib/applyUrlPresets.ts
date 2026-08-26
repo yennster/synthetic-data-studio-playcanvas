@@ -50,6 +50,7 @@ export function applyUrlPresets(): void {
 
   const p = URL_PRESETS;
   if (p.mode) store.setMode(p.mode);
+  if (p.env) store.setEnvPreset(p.env);
   if (p.theme) store.setTheme(p.theme);
   if (p.eiLabel) store.setEi({ label: p.eiLabel });
   if (p.eiCategory) store.setEi({ category: p.eiCategory });

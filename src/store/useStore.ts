@@ -30,6 +30,10 @@ function throttledLocalStorage(delayMs: number): Storage {
 import { BRACCIO_REST_RAD } from '../lib/braccio';
 import type { SplatEntry } from '../engine/splats/SplatManager';
 import type { SkyboxPreset } from '../engine/SkyboxManager';
+import type {
+  CustomTextureMeta,
+  EnvironmentPreset,
+} from '../lib/environmentPresets';
 import type { ModelEntry } from '../engine/ModelManager';
 import type {
   AccelSample,
@@ -292,8 +296,14 @@ interface StudioState {
   sceneObjects: SceneObject[];
   selectedIds: string[];
 
-  /** Procedural sky panorama behind splat scans / open scenes. */
+  /** Legacy sky-only field; migrated into envPreset at boot. */
   skybox: SkyboxPreset;
+  /** Environment: scene presets drive ground + sky, sky presets just the
+   * panorama, 'none' keeps the theme-driven ground. */
+  envPreset: EnvironmentPreset;
+  /** Custom floor/wall texture metadata; the bytes live in IndexedDB. */
+  customFloorTexture: CustomTextureMeta | null;
+  customWallTexture: CustomTextureMeta | null;
   /** Width of the virtual-camera / POV preview overlay, CSS px. */
   pipWidth: number;
 
@@ -331,6 +341,9 @@ interface StudioState {
   setBusy(message: string | null): void;
   setCardOpen(key: string, open: boolean): void;
   setSkybox(preset: SkyboxPreset): void;
+  setEnvPreset(preset: EnvironmentPreset): void;
+  setCustomFloorTexture(meta: CustomTextureMeta | null): void;
+  setCustomWallTexture(meta: CustomTextureMeta | null): void;
   setPipWidth(width: number): void;
   setSplats(entries: SplatEntry[]): void;
   setModels(entries: ModelEntry[]): void;
@@ -405,6 +418,9 @@ export const useStore = create<StudioState>()(
       busyMessage: null,
       cardOpen: {},
       skybox: 'none',
+      envPreset: 'none',
+      customFloorTexture: null,
+      customWallTexture: null,
       pipWidth: 240,
 
       splats: [],
@@ -452,6 +468,9 @@ export const useStore = create<StudioState>()(
       setCardOpen: (key, open) =>
         set((s) => ({ cardOpen: { ...s.cardOpen, [key]: open } })),
       setSkybox: (skybox) => set({ skybox }),
+      setEnvPreset: (envPreset) => set({ envPreset }),
+      setCustomFloorTexture: (customFloorTexture) => set({ customFloorTexture }),
+      setCustomWallTexture: (customWallTexture) => set({ customWallTexture }),
       setPipWidth: (pipWidth) =>
         set({ pipWidth: Math.min(640, Math.max(140, Math.round(pipWidth))) }),
       setSplats: (splats) => set({ splats }),
@@ -525,6 +544,9 @@ export const useStore = create<StudioState>()(
         theme: s.theme,
         mode: s.mode,
         skybox: s.skybox,
+        envPreset: s.envPreset,
+        customFloorTexture: s.customFloorTexture,
+        customWallTexture: s.customWallTexture,
         pipWidth: s.pipWidth,
         cardOpen: s.cardOpen,
         sceneObjects: s.sceneObjects,

@@ -56,6 +56,48 @@
   padding-left: 8px;
 }
 
+/* Inline disclosure toggle (Scene card custom-texture section). Reuses
+ * the ui-collapse-chevron rotation from primitives.css. */
+.vision-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.vision-section-toggle:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
+}
+
+/* Collapsed-state badge listing which texture slots are set. */
+.vision-texture-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
+}
+/* Badge already claimed the trailing space; chevron just trails it. */
+.vision-texture-badge + .ui-collapse-chevron {
+  margin-left: 0;
+}
+
+/* Custom-texture file input (browser chrome is chunky; shrink it). */
+.vision-file {
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 /* Swatch-sized color input. */
 .vision-color {
   flex: none;

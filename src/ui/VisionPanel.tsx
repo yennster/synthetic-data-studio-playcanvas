@@ -2,13 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import { Color } from 'playcanvas';
 import { useEngine } from '../engine/EngineContext';
 import { useStore, type CaptureSettings } from '../store/useStore';
-import { SKYBOX_PRESETS, type SkyboxPreset } from '../engine/SkyboxManager';
+import {
+  ENVIRONMENT_OPTION_GROUPS,
+  floorStyleFor,
+  type CustomTextureMeta,
+  type EnvironmentPreset,
+} from '../lib/environmentPresets';
+import {
+  deleteAssetBlob,
+  putAssetBlob,
+  TEXTURE_STORE,
+  type TextureKind,
+} from '../lib/assetStore';
 import type { CameraTrajectory } from '../lib/types';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
 import { captureSingle, runBatch } from '../modes/visionRunner';
 import { uploadCaptures } from '../lib/edgeImpulse';
 import { URL_FLAGS } from '../lib/urlParams';
 import {
+  ChevronGlyph,
   CollapsibleCard,
   NumberField,
   SliderRow,
@@ -59,14 +71,30 @@ function SceneCard() {
   const lightIntensity = useStore((s) => s.capture.lightIntensity);
   const setCapture = useStore((s) => s.setCapture);
 
-  // Environment knobs are engine-side (not persisted): the procedural
-  // ground + light rig is a viewing aid, not captured dataset state.
+  // Light-rig knobs are engine-side (not persisted): a viewing aid, not
+  // captured dataset state. The environment preset + custom textures ARE
+  // persisted (and applied by EnvironmentSync) — they define the dataset
+  // backdrop.
   const [groundVisible, setGroundVisible] = useState(true);
   const [groundColor, setGroundColor] = useState(DEFAULT_GROUND_COLOR);
-  const skybox = useStore((s) => s.skybox);
-  const setSkybox = useStore((s) => s.setSkybox);
+  const envPreset = useStore((s) => s.envPreset);
+  const setEnvPreset = useStore((s) => s.setEnvPreset);
+  const customFloorTexture = useStore((s) => s.customFloorTexture);
+  const setCustomFloorTexture = useStore((s) => s.setCustomFloorTexture);
+  const customWallTexture = useStore((s) => s.customWallTexture);
+  const setCustomWallTexture = useStore((s) => s.setCustomWallTexture);
   const [lightPitch, setLightPitch] = useState(50);
   const [lightYaw, setLightYaw] = useState(30);
+  // Auto-expand the custom-texture section when one is already uploaded
+  // (the user probably wants to see / clear it); otherwise keep the
+  // Scene card compact behind a single toggle.
+  const [texturesOpen, setTexturesOpen] = useState(
+    customFloorTexture !== null || customWallTexture !== null
+  );
+  // Scene presets and custom floor uploads restyle the ground themselves;
+  // the color picker only makes sense while neither is in charge.
+  const floorOverridden =
+    floorStyleFor(envPreset) !== null || customFloorTexture !== null;
 
   // Effects (not onChange handlers) so a late-booting engine picks up
   // the current UI state as soon as it's ready.
@@ -84,19 +112,66 @@ function SceneCard() {
     <CollapsibleCard heading="Scene" defaultOpen>
       <div className="vision-stack">
         <label className="vision-row">
-          <span className="vision-help">Sky</span>
+          <span className="vision-help">Environment</span>
           <select
-            value={skybox}
-            onChange={(e) => setSkybox(e.target.value as SkyboxPreset)}
-            aria-label="Skybox preset"
+            value={envPreset}
+            onChange={(e) => setEnvPreset(e.target.value as EnvironmentPreset)}
+            aria-label="Environment preset"
           >
-            {SKYBOX_PRESETS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
+            <option value="none">None (flat)</option>
+            {ENVIRONMENT_OPTION_GROUPS.map((g) => (
+              <optgroup key={g.group} label={g.group}>
+                {g.options.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          className="vision-section-toggle"
+          onClick={() => setTexturesOpen((b) => !b)}
+          aria-expanded={texturesOpen}
+        >
+          <span>Custom textures</span>
+          {(customFloorTexture || customWallTexture) && !texturesOpen && (
+            <span className="vision-texture-badge">
+              {[customFloorTexture && 'floor', customWallTexture && 'wall']
+                .filter(Boolean)
+                .join(' + ')}
+            </span>
+          )}
+          <span
+            className={`ui-collapse-chevron${texturesOpen ? ' open' : ''}`}
+            aria-hidden="true"
+          >
+            <ChevronGlyph />
+          </span>
+        </button>
+        {texturesOpen && (
+          <>
+            <p className="vision-help">
+              Floor: tileable image (4× tile). Skybox: 2:1 equirectangular
+              panorama (e.g. 2048×1024) that wraps around the scene. Both
+              override the preset until cleared.
+            </p>
+            <CustomTextureField
+              kind="floor"
+              label="Floor texture"
+              meta={customFloorTexture}
+              setMeta={setCustomFloorTexture}
+            />
+            <CustomTextureField
+              kind="wall"
+              label="Skybox panorama"
+              meta={customWallTexture}
+              setMeta={setCustomWallTexture}
+            />
+          </>
+        )}
         <ToggleSwitch
           title="Ground plane"
           help={
@@ -107,7 +182,7 @@ function SceneCard() {
           on={groundVisible}
           onChange={setGroundVisible}
         />
-        {groundVisible && (
+        {groundVisible && !floorOverridden && (
           <div className="vision-row">
             <input
               type="color"
@@ -153,14 +228,76 @@ function SceneCard() {
           onChange={setLightYaw}
         />
         <p className="vision-note">
-          Environment presets (warehouse, outdoor) and the conveyor belt are
-          tracked in TODO.md. In this edition, splat backdrops are the
-          environment story — import a scan in the{' '}
-          <strong>Gaussian Splats</strong> card and set its role to{' '}
-          <em>backdrop</em>.
+          Scene presets restyle the ground and sky together; sky-only
+          presets leave the ground theme-colored. For photoreal backdrops,
+          import a scan in the <strong>Gaussian Splats</strong> card and set
+          its role to <em>backdrop</em> — it replaces the procedural ground.
         </p>
       </div>
     </CollapsibleCard>
+  );
+}
+
+/**
+ * File picker + clear control for one custom surface texture slot
+ * (floor or wall). Writes the original image bytes to IndexedDB and
+ * stores just the file name in the persisted store, so the texture
+ * survives reloads without bloating localStorage. EnvironmentSync
+ * watches the metadata and feeds the engine.
+ */
+function CustomTextureField({
+  kind,
+  label,
+  meta,
+  setMeta,
+}: {
+  kind: TextureKind;
+  label: string;
+  meta: CustomTextureMeta | null;
+  setMeta: (m: CustomTextureMeta | null) => void;
+}) {
+  const setStatus = useStore((s) => s.setStatus);
+  return (
+    <div className="vision-field">
+      {label}
+      <div className="vision-row">
+        <input
+          type="file"
+          accept="image/*"
+          className="vision-file"
+          aria-label={label}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+              await putAssetBlob(TEXTURE_STORE, kind, file);
+              setMeta({ name: file.name });
+              setStatus('ok', `${label}: ${file.name}`);
+            } catch (err) {
+              setStatus('err', `${label} upload failed: ${(err as Error).message}`);
+            }
+            // Reset the input so picking the same file again still fires
+            // onChange (browsers skip the event if value didn't change).
+            e.target.value = '';
+          }}
+        />
+        {meta && (
+          <button
+            type="button"
+            className="flex-none"
+            onClick={() => {
+              setMeta(null);
+              void deleteAssetBlob(TEXTURE_STORE, kind).catch(() => {});
+              setStatus('ok', `${label} cleared`);
+            }}
+            title={`Remove custom ${kind} texture`}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {meta && <span className="vision-help">Using: {meta.name}</span>}
+    </div>
   );
 }
 

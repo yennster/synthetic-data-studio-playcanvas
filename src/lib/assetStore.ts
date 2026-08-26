@@ -1,14 +1,23 @@
 /**
- * IndexedDB blob store for imported assets (splat scans, GLB models) so
- * scenes survive reloads: bytes live here keyed by entry id; entry
- * metadata persists in localStorage via the zustand store; rehydration
- * re-imports each blob at boot (see rehydrateAssets.ts).
+ * IndexedDB blob store for imported assets (splat scans, GLB models,
+ * custom floor/wall textures) so scenes survive reloads: bytes live here
+ * keyed by entry id; entry metadata persists in localStorage via the
+ * zustand store; rehydration re-imports each blob at boot (see
+ * rehydrateAssets.ts; textures re-apply via the environment sync).
  */
 
 const DB_NAME = 'sds-pc-assets';
-const DB_VERSION = 1;
+// v2 adds the custom floor/wall texture store.
+const DB_VERSION = 2;
 export const SPLAT_STORE = 'splats';
 export const MODEL_STORE = 'models';
+/** Custom floor/wall textures, keyed by fixed slot ('floor' | 'wall')
+ * rather than random uuid — replacing one is just a write to its slot. */
+export const TEXTURE_STORE = 'textures';
+
+export type TextureKind = 'floor' | 'wall';
+
+type StoreName = typeof SPLAT_STORE | typeof MODEL_STORE | typeof TEXTURE_STORE;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -20,6 +29,8 @@ function openDb(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(SPLAT_STORE)) db.createObjectStore(SPLAT_STORE);
       if (!db.objectStoreNames.contains(MODEL_STORE)) db.createObjectStore(MODEL_STORE);
+      if (!db.objectStoreNames.contains(TEXTURE_STORE))
+        db.createObjectStore(TEXTURE_STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'));
@@ -36,7 +47,7 @@ function tx(
 }
 
 export async function putAssetBlob(
-  store: typeof SPLAT_STORE | typeof MODEL_STORE,
+  store: StoreName,
   id: string,
   blob: Blob
 ): Promise<void> {
@@ -49,7 +60,7 @@ export async function putAssetBlob(
 }
 
 export async function getAssetBlob(
-  store: typeof SPLAT_STORE | typeof MODEL_STORE,
+  store: StoreName,
   id: string
 ): Promise<Blob | null> {
   const db = await openDb();
@@ -61,7 +72,7 @@ export async function getAssetBlob(
 }
 
 export async function deleteAssetBlob(
-  store: typeof SPLAT_STORE | typeof MODEL_STORE,
+  store: StoreName,
   id: string
 ): Promise<void> {
   const db = await openDb();
