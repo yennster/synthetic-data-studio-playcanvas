@@ -21,13 +21,14 @@
 
 ## Phase 2 — Gaussian splats (new headline feature)
 - [x] Import: drag&drop + picker for .ply/.compressed.ply/.sog
-- [ ] Import: .spz (needs external SpzParser + zstd wasm from engine examples)
+- [x] Import: .spz (src/lib/spz.ts — gzip, no zstd needed; verified against a real Niantic sample)
 - [x] Splat library card: roles (backdrop/object), labels, remove
 - [x] Create: mesh→splat converter (area-weighted sampling + texture colors)
 - [x] Create: procedural primitives (plane/box/sphere)
-- [ ] Create: image→splat plane (GSplatImage-style)
+- [x] Create: image→splat plane ("+ Image" button; one splat per non-transparent pixel)
 - [x] Edit: GPU erase brush (right-drag), erase/crop box API, reset
-- [ ] Edit: apply edits destructively + export edited imported scans (needs GPU→CPU readback of streams)
+- [x] Edit: paint tint brush (erase|tint toggle, color + strength, op-log replay)
+- [x] Edit: apply edits destructively + export edited imported scans (CPU op log + SplatIterator readback; edits replay on reload)
 - [x] Export created splats to 3DGS .ply
 - [x] Persist splats + models in IndexedDB, restore on reload with transforms
 - [x] Splat transform UI (position/rotation/scale in the edit panel)
@@ -53,16 +54,16 @@
 - [x] Rover: kinematic sim + lidar (ray-AABB) + panel + rig (verified)
 - [x] Arm: Braccio playback via ported IK/trajectories + rig (verified)
 - [x] Robot POV image capture wiring (runner captureImage → POV camera through CaptureRig)
-- [ ] Physics: real dynamics (Ammo/Rapier), conveyor belt, drop/settle behaviors
-- [ ] Hand tracking (MediaPipe) for motion mode
+- [x] Physics: real Rapier dynamics (src/engine/physics/), conveyor belt, drop/settle batches
+- [x] Hand tracking (MediaPipe) for motion mode (pinch-grab body + driven IMU sampler)
 - [ ] Realism diffusion mode endpoint (api/realism-diffusion port — hidden mode, low priority)
 
 ## Phase 6 — Platform
 - [ ] USDZ import (needle-tools OpenUSD wasm + COOP/COEP headers) — GLB works today
 - [x] URL params parsed (ported, full surface) + applyUrlPresets subset
-- [ ] applyUrlPresets: onlyMode filtering, autoUpload, armPose, gizmos flag behaviors
+- [x] applyUrlPresets: onlyMode, autoUpload, armPose, bypassAuth, env, conveyor, gizmos all wired
 - [x] Theme toggle (dark/light) with engine sync
 - [x] Persistence (localStorage v1 + IndexedDB assets)
-- [ ] Iframe embed height messaging (initPostContentHeight port); embed docs
-- [ ] Custom floor/skybox textures + env presets (studio/warehouse/whitebox/outdoor)
+- [x] Iframe embed height messaging (initPostContentHeight wired from main.tsx)
+- [x] Custom floor/skybox textures + env presets (studio/warehouse/whitebox/outdoor)
 - [x] Deploy (Vercel → canvas.jennyspeelman.dev); README screenshots: user-provided, placeholders in README
