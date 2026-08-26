@@ -186,3 +186,82 @@ export function primitiveSplatPoints(opts: PrimitiveOptions): SplatPoint[] {
   }
   return points;
 }
+
+/** Structural subset of ImageData (keeps the converter testable in node). */
+export interface ImagePixels {
+  width: number;
+  height: number;
+  /** RGBA, row-major from the top-left, 0..255 per channel. */
+  data: Uint8ClampedArray | Uint8Array;
+}
+
+export interface ImageToSplatOptions {
+  /** World size of the plane's larger dimension, meters. Default 1.5. */
+  worldMaxDim?: number;
+}
+
+/**
+ * Converts image pixels into an upright splat plane facing ±Z: one splat
+ * per non-transparent pixel, color from the pixel, opacity from alpha.
+ * The plane's larger dimension spans `worldMaxDim` (default 1.5 m); it is
+ * horizontally centered on the origin and rests on y = 0. Splat size is
+ * 1.4× the pixel pitch (an isotropic sigma ≈ 0.7× pitch after the
+ * exporter's size→sigma halving) — enough overlap to look solid without
+ * going blurry. Callers should downscale large images first (the UI caps
+ * the larger dimension at 192 px).
+ */
+export function imagePixelsToSplatPoints(
+  image: ImagePixels,
+  opts: ImageToSplatOptions = {}
+): SplatPoint[] {
+  const { width, height, data } = image;
+  if (width <= 0 || height <= 0) return [];
+  const worldMaxDim = opts.worldMaxDim ?? 1.5;
+  const pitch = worldMaxDim / Math.max(width, height);
+  const size = pitch * 1.4;
+
+  const points: SplatPoint[] = [];
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const o = (row * width + col) * 4;
+      const a = data[o + 3];
+      if (a === 0) continue; // fully transparent pixel — no splat
+      points.push({
+        x: (col + 0.5 - width / 2) * pitch,
+        y: (height - row - 0.5) * pitch, // row 0 is the image top
+        z: 0,
+        size,
+        r: data[o] / 255,
+        g: data[o + 1] / 255,
+        b: data[o + 2] / 255,
+        a: a / 255,
+      });
+    }
+  }
+  return points;
+}
+
+/** Largest image dimension fed into the pixel→splat converter. */
+export const IMAGE_SPLAT_MAX_DIM = 192;
+
+/**
+ * Browser-side helper: decodes an image file, downscales it so its larger
+ * dimension is at most {@link IMAGE_SPLAT_MAX_DIM}, and returns the pixels.
+ */
+export async function imageFileToPixels(file: File): Promise<ImagePixels> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, IMAGE_SPLAT_MAX_DIM / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('2D canvas unavailable for image decoding');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    return ctx.getImageData(0, 0, width, height);
+  } finally {
+    bitmap.close();
+  }
+}

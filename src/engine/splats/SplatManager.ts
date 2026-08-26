@@ -8,8 +8,10 @@ import {
   type SplatPoint,
 } from './splatCreate';
 import { meshEntityToSplatPoints, type MeshToSplatOptions } from './meshToSplat';
-import { pointsToPly } from './splatExport';
+import { gsplatDataToPly, pointsToPly } from './splatExport';
 import { deleteAssetBlob, putAssetBlob, SPLAT_STORE } from '../../lib/assetStore';
+import { gunzip, parseSpz, spzToGsplatData } from '../../lib/spz';
+import { shouldCoalesceOps, type SplatEditOp } from '../../lib/splatOps';
 
 /** How a splat participates in synthetic data generation. */
 export type SplatRole = 'backdrop' | 'object';
@@ -18,7 +20,8 @@ export type SplatSource =
   | { kind: 'file'; filename: string }
   | { kind: 'url'; url: string }
   | { kind: 'primitive'; primitive: PrimitiveOptions['kind'] }
-  | { kind: 'mesh'; meshName: string };
+  | { kind: 'mesh'; meshName: string }
+  | { kind: 'image'; imageName: string };
 
 export interface SplatEntry {
   id: string;
@@ -39,13 +42,16 @@ export interface SplatEntry {
   /** Cached LOCAL-space point sample (inside tightAabb) for tight
    * screen-space bounding boxes. */
   labelSample?: Float32Array;
+  /** Recorded GPU brush edits (LOCAL splat space): replayed on reload and
+   * baked into destructive exports. See lib/splatOps.ts. */
+  editOps?: SplatEditOp[];
 }
 
-export const SPLAT_EXTENSIONS = ['.ply', '.compressed.ply', '.sog'];
+export const SPLAT_EXTENSIONS = ['.ply', '.compressed.ply', '.sog', '.spz'];
 
 export function isSplatFilename(name: string): boolean {
   const lower = name.toLowerCase();
-  return lower.endsWith('.ply') || lower.endsWith('.sog');
+  return lower.endsWith('.ply') || lower.endsWith('.sog') || lower.endsWith('.spz');
 }
 
 type Listener = (entries: SplatEntry[]) => void;
@@ -149,13 +155,26 @@ export class SplatManager {
         `Unsupported splat format: ${file.name}. Supported: ${SPLAT_EXTENSIONS.join(', ')}`
       );
     }
+    // The engine has no .spz parser — transcode Niantic SPZ to an
+    // uncompressed 3DGS .ply in memory and feed it through the normal
+    // .ply path. The ORIGINAL .spz blob is what persists in IndexedDB
+    // (10–20× smaller); rehydration re-transcodes on load.
+    let loadFile = file;
+    if (file.name.toLowerCase().endsWith('.spz')) {
+      const gaussians = parseSpz(await gunzip(await file.arrayBuffer()));
+      const data = spzToGsplatData(gaussians);
+      loadFile = new File(
+        [gsplatDataToPly(data)],
+        file.name.replace(/\.spz$/i, '.ply')
+      );
+    }
     // The gsplat parsers select by asset.file.filename extension and read
     // asset.file.contents as a Response when present, skipping any fetch.
-    const url = URL.createObjectURL(file);
-    const asset = new Asset(file.name, 'gsplat', {
+    const url = URL.createObjectURL(loadFile);
+    const asset = new Asset(loadFile.name, 'gsplat', {
       url,
-      filename: file.name,
-      contents: new Response(file) as unknown as ArrayBuffer,
+      filename: loadFile.name,
+      contents: new Response(loadFile) as unknown as ArrayBuffer,
     });
     try {
       const entry = await this.loadAsset(
@@ -306,6 +325,34 @@ export class SplatManager {
     }
   }
 
+  /**
+   * Records a GPU brush op (LOCAL splat space) on the entry that owns
+   * `entity`. Near-identical drag strokes are coalesced. Does NOT emit —
+   * brush strokes arrive per mousemove; call {@link notifyEditsChanged}
+   * once at stroke end so persistence snapshots the log.
+   */
+  recordEditOp(entity: Entity, op: SplatEditOp): void {
+    const entry = this.entries.find((e) => e.entity === entity);
+    if (!entry) return;
+    const ops = entry.editOps ?? (entry.editOps = []);
+    if (ops.length > 0 && shouldCoalesceOps(ops[ops.length - 1], op)) return;
+    ops.push(op);
+  }
+
+  /** Emits after a batch of {@link recordEditOp} calls (stroke end). */
+  notifyEditsChanged(): void {
+    this.emit();
+  }
+
+  /** Drops an entry's recorded edit ops (pairs with a GPU edit reset). */
+  clearEditOps(id: string): void {
+    const entry = this.entries.find((e) => e.id === id);
+    if (entry && entry.editOps) {
+      entry.editOps = undefined;
+      this.emit();
+    }
+  }
+
   remove(id: string): void {
     const index = this.entries.findIndex((e) => e.id === id);
     if (index >= 0) {
@@ -339,7 +386,7 @@ export class SplatManager {
 
 function defaultLabel(name: string): string {
   return name
-    .replace(/\.(compressed\.)?(ply|sog)$/i, '')
+    .replace(/\.(compressed\.)?(ply|sog|spz)$/i, '')
     .replace(/[_-]+/g, ' ')
     .trim()
     .toLowerCase() || 'object';

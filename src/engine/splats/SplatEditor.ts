@@ -2,29 +2,35 @@ import {
   GSPLAT_STREAM_INSTANCE,
   GSplatProcessor,
   PIXELFORMAT_R8,
+  PIXELFORMAT_RGBA8,
   Vec3,
   WORKBUFFER_UPDATE_ONCE,
   type AppBase,
   type Entity,
 } from 'playcanvas';
+import type { SplatEditOp } from '../../lib/splatOps';
 
 /**
- * GPU splat editing via a `splatVisible` instance stream: erase (sphere),
- * delete-in-box, and crop-to-box work on ANY splat — imported scans
- * included — by writing 0 into the stream and zeroing the splat's scale in
- * the work-buffer modifier. Mirrors the engine's gaussian-splatting editor
- * example. Edits are non-destructive to the source asset (reset restores).
+ * GPU splat editing via instance streams: erase (sphere/box/crop) writes 0
+ * into a `splatVisible` stream and the work-buffer modifier collapses those
+ * splats' scale; tint writes (color, strength) into a `splatTint` stream
+ * and the modifier mixes it into the splat color. Works on ANY splat —
+ * imported scans included — mirroring the engine's gaussian-splatting
+ * editor example. Edits are non-destructive to the source asset (reset
+ * restores).
+ *
+ * All coordinates are the splat's LOCAL space (`getCenter()` raw): ops are
+ * recorded/persisted in local space (see lib/splatOps.ts), so applying them
+ * here is transform-independent and reload replay is exact.
  */
 
-/** Erases splats whose world-space center lies inside a sphere. */
+/** Erases splats whose local-space center lies inside a sphere. */
 const sphereEraseShader = {
   processGLSL: /* glsl */ `
-    uniform vec4 uEraseSphere; // xyz = world center, w = radius
-    uniform mat4 matrix_model;
+    uniform vec4 uEraseSphere; // xyz = local center, w = radius
 
     void process() {
-      vec3 world = (matrix_model * vec4(getCenter(), 1.0)).xyz;
-      if (distance(world, uEraseSphere.xyz) < uEraseSphere.w) {
+      if (distance(getCenter(), uEraseSphere.xyz) < uEraseSphere.w) {
         writeSplatVisible(vec4(0.0));
       } else {
         discard;
@@ -33,11 +39,9 @@ const sphereEraseShader = {
   `,
   processWGSL: /* wgsl */ `
     uniform uEraseSphere: vec4f;
-    uniform matrix_model: mat4x4f;
 
     fn process() {
-      let world = (uniform.matrix_model * vec4f(getCenter(), 1.0)).xyz;
-      if (distance(world, uniform.uEraseSphere.xyz) < uniform.uEraseSphere.w) {
+      if (distance(getCenter(), uniform.uEraseSphere.xyz) < uniform.uEraseSphere.w) {
         writeSplatVisible(vec4f(0.0));
       } else {
         discard;
@@ -46,17 +50,16 @@ const sphereEraseShader = {
   `,
 };
 
-/** Erases splats inside (mode 0) or outside (mode 1 = crop) a world AABB. */
+/** Erases splats inside (mode 0) or outside (mode 1 = crop) a local AABB. */
 const boxShader = {
   processGLSL: /* glsl */ `
     uniform vec3 uBoxMin;
     uniform vec3 uBoxMax;
     uniform float uKeepInside; // 1.0 = crop (erase outside), 0.0 = erase inside
-    uniform mat4 matrix_model;
 
     void process() {
-      vec3 world = (matrix_model * vec4(getCenter(), 1.0)).xyz;
-      bool inside = all(greaterThanEqual(world, uBoxMin)) && all(lessThanEqual(world, uBoxMax));
+      vec3 local = getCenter();
+      bool inside = all(greaterThanEqual(local, uBoxMin)) && all(lessThanEqual(local, uBoxMax));
       bool erase = (uKeepInside > 0.5) ? !inside : inside;
       if (erase) {
         writeSplatVisible(vec4(0.0));
@@ -69,14 +72,46 @@ const boxShader = {
     uniform uBoxMin: vec3f;
     uniform uBoxMax: vec3f;
     uniform uKeepInside: f32;
-    uniform matrix_model: mat4x4f;
 
     fn process() {
-      let world = (uniform.matrix_model * vec4f(getCenter(), 1.0)).xyz;
-      let inside = all(world >= uniform.uBoxMin) && all(world <= uniform.uBoxMax);
+      let local = getCenter();
+      let inside = all(local >= uniform.uBoxMin) && all(local <= uniform.uBoxMax);
       let erase = select(inside, !inside, uniform.uKeepInside > 0.5);
       if (erase) {
         writeSplatVisible(vec4f(0.0));
+      } else {
+        discard;
+      }
+    }
+  `,
+};
+
+/**
+ * Writes (tint color, strength) for splats inside a local-space sphere.
+ * Each stroke OVERWRITES the splat's tint state; the modifier applies one
+ * mix(base, tint, strength), so restrokes don't compound (the CPU bake in
+ * lib/splatOps.ts mirrors this exactly).
+ */
+const tintShader = {
+  processGLSL: /* glsl */ `
+    uniform vec4 uTintSphere; // xyz = local center, w = radius
+    uniform vec4 uTintColor;  // rgb = tint, a = strength
+
+    void process() {
+      if (distance(getCenter(), uTintSphere.xyz) < uTintSphere.w) {
+        writeSplatTint(uTintColor);
+      } else {
+        discard;
+      }
+    }
+  `,
+  processWGSL: /* wgsl */ `
+    uniform uTintSphere: vec4f;
+    uniform uTintColor: vec4f;
+
+    fn process() {
+      if (distance(getCenter(), uniform.uTintSphere.xyz) < uniform.uTintSphere.w) {
+        writeSplatTint(uniform.uTintColor);
       } else {
         discard;
       }
@@ -97,6 +132,8 @@ const workBufferModifier = {
     }
 
     void modifySplatColor(vec3 center, inout vec4 color) {
+      vec4 tint = texelFetch(splatTint, splat.uv, 0);
+      color.rgb = mix(color.rgb, tint.rgb, tint.a);
     }
   `,
   wgsl: /* wgsl */ `
@@ -111,6 +148,8 @@ const workBufferModifier = {
     }
 
     fn modifySplatColor(center: vec3f, color: ptr<function, vec4f>) {
+      let tint = textureLoad(splatTint, splat.uv, 0);
+      (*color) = vec4f(mix((*color).rgb, tint.rgb, tint.a), (*color).a);
     }
   `,
 };
@@ -118,6 +157,7 @@ const workBufferModifier = {
 interface EditState {
   sphereProc: GSplatProcessor;
   boxProc: GSplatProcessor;
+  tintProc: GSplatProcessor;
 }
 
 export class SplatEditor {
@@ -145,8 +185,14 @@ export class SplatEditor {
         { name: 'splatVisible', format: PIXELFORMAT_R8, storage: GSPLAT_STREAM_INSTANCE },
       ]);
     }
+    if (!resource.format.getStream('splatTint')) {
+      resource.format.addExtraStreams([
+        { name: 'splatTint', format: PIXELFORMAT_RGBA8, storage: GSPLAT_STREAM_INSTANCE },
+      ]);
+    }
 
     this.resetVisibility(entity);
+    this.resetTint(entity);
 
     const device = this.app.graphicsDevice;
     const sphereProc = new GSplatProcessor(
@@ -161,9 +207,15 @@ export class SplatEditor {
       { component, streams: ['splatVisible'] },
       boxShader
     );
+    const tintProc = new GSplatProcessor(
+      device,
+      { component },
+      { component, streams: ['splatTint'] },
+      tintShader
+    );
     component.setWorkBufferModifier(workBufferModifier);
 
-    const state: EditState = { sphereProc, boxProc };
+    const state: EditState = { sphereProc, boxProc, tintProc };
     this.states.set(entity, state);
     return state;
   }
@@ -173,25 +225,45 @@ export class SplatEditor {
     entity.gsplat!.workBufferUpdate = WORKBUFFER_UPDATE_ONCE;
   }
 
-  /** Erases splats within `radius` of a world-space point. */
-  eraseSphere(entity: Entity, worldCenter: Vec3, radius: number): void {
+  /** Erases splats within `radius` of a LOCAL-space point. */
+  eraseSphere(entity: Entity, localCenter: Vec3, radius: number): void {
     const state = this.ensure(entity);
     if (!state) return;
     state.sphereProc.setParameter('uEraseSphere', [
-      worldCenter.x,
-      worldCenter.y,
-      worldCenter.z,
+      localCenter.x,
+      localCenter.y,
+      localCenter.z,
       radius,
     ]);
     this.run(entity, state.sphereProc);
   }
 
-  /** Erases everything OUTSIDE the world AABB (crop). */
+  /** Tints splats within `radius` of a LOCAL-space point toward `color`. */
+  tintSphere(
+    entity: Entity,
+    localCenter: Vec3,
+    radius: number,
+    color: [number, number, number],
+    strength: number
+  ): void {
+    const state = this.ensure(entity);
+    if (!state) return;
+    state.tintProc.setParameter('uTintSphere', [
+      localCenter.x,
+      localCenter.y,
+      localCenter.z,
+      radius,
+    ]);
+    state.tintProc.setParameter('uTintColor', [color[0], color[1], color[2], strength]);
+    this.run(entity, state.tintProc);
+  }
+
+  /** Erases everything OUTSIDE the LOCAL-space AABB (crop). */
   cropToBox(entity: Entity, min: Vec3, max: Vec3): void {
     this.applyBox(entity, min, max, true);
   }
 
-  /** Erases everything INSIDE the world AABB. */
+  /** Erases everything INSIDE the LOCAL-space AABB. */
   eraseBox(entity: Entity, min: Vec3, max: Vec3): void {
     this.applyBox(entity, min, max, false);
   }
@@ -205,6 +277,24 @@ export class SplatEditor {
     this.run(entity, state.boxProc);
   }
 
+  /** Replays one recorded LOCAL-space edit op (reload restore path). */
+  applyOp(entity: Entity, op: SplatEditOp): void {
+    switch (op.kind) {
+      case 'eraseSphere':
+        this.eraseSphere(entity, new Vec3(...op.center), op.radius);
+        break;
+      case 'eraseBox':
+        this.eraseBox(entity, new Vec3(...op.min), new Vec3(...op.max));
+        break;
+      case 'crop':
+        this.cropToBox(entity, new Vec3(...op.min), new Vec3(...op.max));
+        break;
+      case 'tintSphere':
+        this.tintSphere(entity, new Vec3(...op.center), op.radius, op.color, op.strength);
+        break;
+    }
+  }
+
   /** Restores every splat to visible. */
   resetVisibility(entity: Entity): void {
     const texture = entity.gsplat?.getInstanceTexture('splatVisible');
@@ -214,6 +304,23 @@ export class SplatEditor {
     if (this.states.has(entity)) {
       entity.gsplat!.workBufferUpdate = WORKBUFFER_UPDATE_ONCE;
     }
+  }
+
+  /** Clears every tint (strength 0). */
+  resetTint(entity: Entity): void {
+    const texture = entity.gsplat?.getInstanceTexture('splatTint');
+    if (!texture) return;
+    (texture.lock() as Uint8Array).fill(0);
+    texture.unlock();
+    if (this.states.has(entity)) {
+      entity.gsplat!.workBufferUpdate = WORKBUFFER_UPDATE_ONCE;
+    }
+  }
+
+  /** Restores the splat to its unedited state (visibility + tint). */
+  resetEdits(entity: Entity): void {
+    this.resetVisibility(entity);
+    this.resetTint(entity);
   }
 
   /** Whether the entity has any edits prepared. */
@@ -226,6 +333,7 @@ export class SplatEditor {
     if (state) {
       state.sphereProc.destroy();
       state.boxProc.destroy();
+      state.tintProc.destroy();
       this.states.delete(entity);
     }
   }
@@ -241,6 +349,7 @@ export class SplatEditor {
     for (const state of this.states.values()) {
       state.sphereProc.destroy();
       state.boxProc.destroy();
+      state.tintProc.destroy();
     }
     this.states.clear();
   }

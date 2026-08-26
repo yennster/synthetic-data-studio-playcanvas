@@ -1,6 +1,7 @@
 import type { StudioEngine } from './StudioEngine';
 import { useStore, type PendingAsset } from '../store/useStore';
 import { getAssetBlob, deleteAssetBlob, MODEL_STORE, SPLAT_STORE } from '../lib/assetStore';
+import { flipEditOpsZ180, plyReimportEuler, sanitizeEditOps } from '../lib/splatOps';
 
 // Module-level guard (not a ref): React StrictMode's synthetic remount
 // would otherwise race two rehydrations into the asset managers.
@@ -56,6 +57,13 @@ export async function rehydrateAssets(engine: StudioEngine): Promise<void> {
         applyTransform(entry.entity, meta);
         if (!entry.entity.enabled && meta.enabled !== false) entry.entity.enabled = true;
         if (meta.enabled === false) entry.entity.enabled = false;
+        // Brush edits are GPU-side visibility/tint streams — replay the
+        // recorded op log so erase/tint edits survive reloads.
+        const ops = sanitizeEditOps(meta.editOps);
+        if (ops.length > 0) {
+          entry.editOps = ops;
+          for (const op of ops) engine.splatEditor.applyOp(entry.entity, op);
+        }
       } catch (err) {
         console.warn(`splat restore failed for ${meta.name}`, err);
       }
@@ -105,20 +113,35 @@ export function snapshotPendingAssets(engine: StudioEngine): void {
   ];
 
   store.setPendingSplats(
-    engine.splats.entries.map((e) => ({
-      id: e.id,
-      name: e.name,
-      filename:
-        e.source.kind === 'file'
-          ? e.source.filename
-          : `${e.name.replace(/[^a-zA-Z0-9_. -]/g, '_') || 'splat'}.ply`,
-      label: e.label,
-      role: e.role,
-      position: vec(e.entity.getLocalPosition()),
-      eulerAngles: vec(e.entity.getLocalEulerAngles()),
-      scale: vec(e.entity.getLocalScale()),
-      enabled: e.entity.enabled,
-    }))
+    engine.splats.entries.map((e) => {
+      // Created splats (primitive/mesh/image) persist as a Y-down .ply and
+      // reload through the import path, so their euler must be converted
+      // to the .ply convention (see plyReimportEuler). File/url imports
+      // already live in that convention.
+      const created = e.source.kind !== 'file' && e.source.kind !== 'url';
+      const euler = vec(e.entity.getLocalEulerAngles());
+      return {
+        id: e.id,
+        name: e.name,
+        filename:
+          e.source.kind === 'file'
+            ? e.source.filename
+            : `${e.name.replace(/[^a-zA-Z0-9_. -]/g, '_') || 'splat'}.ply`,
+        label: e.label,
+        role: e.role,
+        position: vec(e.entity.getLocalPosition()),
+        eulerAngles: created ? plyReimportEuler(euler) : euler,
+        scale: vec(e.entity.getLocalScale()),
+        enabled: e.entity.enabled,
+        // Created-splat ops were recorded against creation-space data; the
+        // persisted .ply is flipped, so the persisted ops flip with it.
+        editOps: e.editOps?.length
+          ? created
+            ? flipEditOpsZ180(e.editOps)
+            : e.editOps
+          : undefined,
+      };
+    })
   );
   store.setPendingModels(
     engine.models.entries.map((e) => ({

@@ -9,6 +9,7 @@ import {
   EVENT_MOUSEMOVE,
   EVENT_MOUSEUP,
   MOUSEBUTTON_RIGHT,
+  Mat4,
   Picker,
   TONEMAP_ACES,
   Vec2,
@@ -28,6 +29,7 @@ import { SplatEditor } from './splats/SplatEditor';
 import { SkyboxManager } from './SkyboxManager';
 import { GizmoRenderer } from './GizmoRenderer';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
+import type { SplatEditOp } from '../lib/splatOps';
 import { SelectionController } from './SelectionController';
 import { CaptureRig } from './capture/CaptureRig';
 import { PhysicsWorld } from './physics/PhysicsWorld';
@@ -59,7 +61,13 @@ export class StudioEngine {
   selection: SelectionController;
   /** In-canvas picture-in-picture preview of the capture camera. */
   previewCamera: Entity;
-  private eraseTarget: { entity: Entity; radius: number } | null = null;
+  private eraseTarget: {
+    entity: Entity;
+    radius: number;
+    mode: 'erase' | 'tint';
+    tintColor: [number, number, number];
+    tintStrength: number;
+  } | null = null;
   private erasing = false;
   private picker: Picker | null = null;
   private pickerDirty = true;
@@ -214,11 +222,29 @@ export class StudioEngine {
   }
 
   /**
-   * Splat erase brush: while active, right-drag erases splats of the target
-   * entity around the picked world point (LMB still orbits the camera).
+   * Splat brush: while active, right-drag erases (or tints) splats of the
+   * target entity around the picked world point (LMB still orbits the
+   * camera). Every applied stroke is also recorded on the entry's edit-op
+   * log for reload replay and destructive export.
    */
-  setEraseMode(entity: Entity | null, radius = 0.15): void {
-    this.eraseTarget = entity ? { entity, radius } : null;
+  setEraseMode(
+    entity: Entity | null,
+    radius = 0.15,
+    options?: {
+      mode?: 'erase' | 'tint';
+      tintColor?: [number, number, number];
+      tintStrength?: number;
+    }
+  ): void {
+    this.eraseTarget = entity
+      ? {
+          entity,
+          radius,
+          mode: options?.mode ?? 'erase',
+          tintColor: options?.tintColor ?? [1, 0, 0],
+          tintStrength: options?.tintStrength ?? 0.8,
+        }
+      : null;
     this.erasing = false;
     if (entity) this.app.mouse?.disableContextMenu();
   }
@@ -382,7 +408,30 @@ export class StudioEngine {
         const current = this.eraseTarget;
         // The entity may have been removed while the async pick resolved.
         if (worldPoint && current && current.entity.gsplat) {
-          this.splatEditor.eraseSphere(current.entity, worldPoint, current.radius);
+          // Ops live in the splat's LOCAL space so they are recordable,
+          // replayable after reload, and bakeable into exports.
+          const world = current.entity.getWorldTransform();
+          const local = new Mat4().copy(world).invert().transformPoint(worldPoint);
+          const worldScale = world.getScale().x || 1;
+          const op: SplatEditOp =
+            current.mode === 'tint'
+              ? {
+                  kind: 'tintSphere',
+                  center: [local.x, local.y, local.z],
+                  radius: current.radius / worldScale,
+                  color: [...current.tintColor],
+                  strength: current.tintStrength,
+                }
+              : {
+                  kind: 'eraseSphere',
+                  center: [local.x, local.y, local.z],
+                  radius: current.radius / worldScale,
+                };
+          this.splatEditor.applyOp(current.entity, op);
+          this.splats.recordEditOp(current.entity, op);
+          // A pick can resolve after mouseup (stroke already ended) —
+          // snapshot immediately so the trailing op persists too.
+          if (!this.erasing) this.splats.notifyEditsChanged();
         }
       });
     };
@@ -398,7 +447,11 @@ export class StudioEngine {
       if (this.erasing) eraseAt(e.x, e.y);
     });
     mouse.on(EVENT_MOUSEUP, (e: { button: number }) => {
-      if (e.button === MOUSEBUTTON_RIGHT) this.erasing = false;
+      if (e.button === MOUSEBUTTON_RIGHT && this.erasing) {
+        this.erasing = false;
+        // Stroke finished — emit once so persistence snapshots the op log.
+        this.splats.notifyEditsChanged();
+      }
     });
   }
 

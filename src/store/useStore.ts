@@ -29,6 +29,7 @@ function throttledLocalStorage(delayMs: number): Storage {
 }
 import { BRACCIO_REST_RAD } from '../lib/braccio';
 import type { SplatEntry } from '../engine/splats/SplatManager';
+import type { SplatEditOp } from '../lib/splatOps';
 import type { SkyboxPreset } from '../engine/SkyboxManager';
 import type {
   CustomTextureMeta,
@@ -273,6 +274,8 @@ export interface PendingAsset {
     roughness: number;
     metalness: number;
   };
+  /** Splats only: recorded brush edits (LOCAL space), replayed on reload. */
+  editOps?: SplatEditOp[];
 }
 
 interface StudioState {

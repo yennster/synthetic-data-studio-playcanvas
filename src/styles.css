@@ -421,6 +421,21 @@ input[type='password'] {
   min-width: 0;
 }
 
+/* Tint-brush color swatch in the splat edit panel. */
+.splat-row-edit input[type='color'] {
+  width: 100%;
+  height: 26px;
+  padding: 2px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--panel-raised);
+  cursor: pointer;
+}
+
+.splat-row-edit .button-row {
+  margin-top: 0;
+}
+
 .model-controls {
   margin-top: 6px;
   padding: 8px;
