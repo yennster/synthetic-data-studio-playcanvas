@@ -12,6 +12,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "jszip": "^3.10.1",
     "playcanvas": "^2.21.4",
     "react": "^19.2.8",
