@@ -7,7 +7,7 @@
 > Original app's behavior contract: [docs/ORIGINAL-FEATURES.md](docs/ORIGINAL-FEATURES.md).
 > Parity tracking: [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md).
 
-**Last updated:** 2026-08-25 (session 2)
+**Last updated:** 2026-08-26 (session 3)
 
 ## What this project is
 
@@ -20,6 +20,23 @@ creation/editing** for hyper-realistic synthetic data. Repo:
   `synthetic-data-studio-playcanvas`, GitHub-connected + `vercel deploy --prod` from the CLI).
 - Engine: `playcanvas` **2.21.4** (npm), TypeScript, Vite, React, zustand.
 - `npm run dev` → http://localhost:5173. `npx vitest run` → 399 tests. `npx tsc -b` clean. CI on push.
+
+## Session 3 (2026-08-26): camera fly mode + keyboard shortcut layer
+
+- **WASD/QE/arrow fly** via CameraControls `enableFly` (⇧ fast / Ctrl slow; room-scale
+  speeds 2.5/6/0.8 m/s) — StudioEngine.ts
+- **Shortcut layer** `src/ui/useKeyboardShortcuts.tsx` (mounted in App): F frame selection,
+  Delete/⌫ remove, [/] rotate ∓15°, -/= scale ×1.1 (clamped 0.02–20), C single capture
+  (vision modes), H toggle sidebar (`sds:toggle-sidebar` event), ? toggle help
+  (`sds:toggle-help`); object-kind rotation/scale read the **store** (entity values are
+  wrapped eulers / kind-scaled — reading the entity caused wrap/×0.6 bugs)
+- Shared `routeSelectionTransform`/`removeSelection` extracted in useSelection.tsx (drags +
+  shortcuts route identically)
+- **Form-focus guard**: the engine's KeyboardMouseSource listens on window (bubble, no focus
+  check) and consumes move keys even in orbit mode — StudioEngine registers a capture-phase
+  keydown/keyup blocker that `stopImmediatePropagation()`s WASD/QE/arrows while
+  `document.activeElement` is input-like. Verified in-browser: guarded W ≈ 0 m, free W 1.44 m,
+  ]=+15.0°, ==×1.10, F/Delete/H/? all pass; 399 tests green.
 
 ## Session 2 (2026-08-25): samples, UX from live feedback, deploy
 

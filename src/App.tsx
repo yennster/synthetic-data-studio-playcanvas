@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EngineProvider } from './engine/EngineContext';
 import { Sidebar } from './ui/Sidebar';
 import { Hud } from './ui/Hud';
@@ -6,6 +6,7 @@ import { ThemeSync } from './ui/ThemeSync';
 import { SkyboxSync } from './ui/SkyboxSync';
 import { WelcomePrompt } from './ui/WelcomePrompt';
 import { SelectionChip } from './ui/useSelection';
+import { KeyboardShortcuts } from './ui/useKeyboardShortcuts';
 import { useCaptureCameraSync } from './ui/useCaptureCameraSync';
 import { useStore } from './store/useStore';
 import { URL_FLAGS } from './lib/urlParams';
@@ -33,11 +34,20 @@ export default function App() {
     });
   };
 
+  // 'H' shortcut routes here (the shortcut layer lives inside the
+  // engine provider and has no access to this local state).
+  useEffect(() => {
+    const onToggle = () => toggleSidebar();
+    window.addEventListener('sds:toggle-sidebar', onToggle);
+    return () => window.removeEventListener('sds:toggle-sidebar', onToggle);
+  }, []);
+
   return (
     <EngineProvider>
       <ThemeSync />
       <SkyboxSync />
       <CaptureSync />
+      <KeyboardShortcuts />
       <div
         className={`ui-overlay${noChrome ? ' no-chrome' : ''}${
           sidebarHidden ? ' sidebar-hidden' : ''

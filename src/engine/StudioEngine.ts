@@ -135,13 +135,51 @@ export class StudioEngine {
     this.viewCamera.addComponent('script');
     this.cameraControls = this.viewCamera.script!.create(CameraControls as any, {
       properties: {
-        enableFly: false,
+        // Fly mode: WASD move, Q/E down/up, arrows, Shift fast, Ctrl slow.
+        enableFly: true,
         enablePan: true,
         focusPoint: new Vec3(0, 0.5, 0),
         zoomRange: new Vec2(0.5, 40),
       },
     });
+    // Room-scale speeds — the stock 10 m/s crosses an apartment scan in
+    // half a second.
+    this.cameraControls.moveSpeed = 2.5;
+    this.cameraControls.moveFastSpeed = 6;
+    this.cameraControls.moveSlowSpeed = 0.8;
     app.root.addChild(this.viewCamera);
+
+    // The camera-controls key source listens on window with no focus
+    // guard — typing "wasd" into a label field would fly the camera
+    // (and it consumes the move keys even in orbit mode, so toggling
+    // enableFly is not enough). Block movement keys at the CAPTURE
+    // phase while an input-like element has focus, so the script's
+    // bubble-phase listener never sees them.
+    const MOVE_KEYS = new Set([
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    ]);
+    const isFormTarget = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (!el || !el.tagName) return false;
+      return (
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.tagName === 'SELECT' ||
+        el.isContentEditable
+      );
+    };
+    const blockKeys = (e: KeyboardEvent) => {
+      if (MOVE_KEYS.has(e.code) && isFormTarget(document.activeElement)) {
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener('keydown', blockKeys, true);
+    window.addEventListener('keyup', blockKeys, true);
+    app.on('destroy', () => {
+      window.removeEventListener('keydown', blockKeys, true);
+      window.removeEventListener('keyup', blockKeys, true);
+    });
   }
 
   static async create(canvas: HTMLCanvasElement): Promise<StudioEngine> {

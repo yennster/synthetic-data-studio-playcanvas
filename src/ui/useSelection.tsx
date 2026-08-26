@@ -1,7 +1,50 @@
 import { useEffect, useState } from 'react';
 import { useEngine } from '../engine/EngineContext';
 import { useStore } from '../store/useStore';
+import type { StudioEngine } from '../engine/StudioEngine';
 import type { Selection, TransformPatch } from '../engine/SelectionController';
+
+/**
+ * Applies a transform patch to whatever owns the selection: spawned
+ * primitives live in the store; models and splats go through their
+ * managers (both persist). Shared by viewport drags and keyboard
+ * shortcuts.
+ */
+export function routeSelectionTransform(
+  engine: StudioEngine,
+  sel: Selection,
+  patch: TransformPatch
+): void {
+  const r = (v: number) => Math.round(v * 1000) / 1000;
+  if (sel.kind === 'object') {
+    const store = useStore.getState();
+    const obj = store.sceneObjects.find((o) => o.id === sel.id);
+    if (!obj) return;
+    const update: Partial<typeof obj> = {};
+    if (patch.position) {
+      update.position = [r(patch.position[0]), r(patch.position[1]), r(patch.position[2])];
+      // A manual height change opts the object out of auto ground-rest.
+      if (patch.position[1] !== obj.position[1] && obj.physics) {
+        update.physics = false;
+      }
+    }
+    if (patch.yawDeg !== undefined) update.rotation = (patch.yawDeg * Math.PI) / 180;
+    if (patch.scale !== undefined) update.scale = r(patch.scale);
+    store.updateObject(sel.id, update);
+  } else if (sel.kind === 'model') {
+    engine.models.setTransform(sel.id, patch);
+  } else {
+    engine.splats.setTransform(sel.id, patch);
+  }
+}
+
+/** Removes whatever owns the selection. */
+export function removeSelection(engine: StudioEngine, sel: Selection): void {
+  if (sel.kind === 'object') useStore.getState().removeObject(sel.id);
+  else if (sel.kind === 'model') engine.models.remove(sel.id);
+  else engine.splats.remove(sel.id);
+  engine.selection.clear();
+}
 
 /**
  * Wires the viewport SelectionController to the app:
@@ -24,29 +67,7 @@ export function useSelection(): Selection | null {
       useStore.getState().setSelectedIds(sel ? [sel.id] : []);
     };
 
-    ctl.onTransform = (sel, patch: TransformPatch) => {
-      const r = (v: number) => Math.round(v * 1000) / 1000;
-      if (sel.kind === 'object') {
-        const store = useStore.getState();
-        const obj = store.sceneObjects.find((o) => o.id === sel.id);
-        if (!obj) return;
-        const update: Partial<typeof obj> = {};
-        if (patch.position) {
-          update.position = [r(patch.position[0]), r(patch.position[1]), r(patch.position[2])];
-          // A manual height drag opts the object out of auto ground-rest.
-          if (patch.position[1] !== obj.position[1] && obj.physics) {
-            update.physics = false;
-          }
-        }
-        if (patch.yawDeg !== undefined) update.rotation = (patch.yawDeg * Math.PI) / 180;
-        if (patch.scale !== undefined) update.scale = r(patch.scale);
-        store.updateObject(sel.id, update);
-      } else if (sel.kind === 'model') {
-        engine.models.setTransform(sel.id, patch);
-      } else {
-        engine.splats.setTransform(sel.id, patch);
-      }
-    };
+    ctl.onTransform = (sel, patch) => routeSelectionTransform(engine, sel, patch);
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') ctl.clear();

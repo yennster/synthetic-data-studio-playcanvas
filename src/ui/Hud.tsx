@@ -1,18 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { URL_FLAGS } from '../lib/urlParams';
 
 const TIP_KEY = 'sds-hud-tip-open';
 
 const CONTROLS: [string, string][] = [
+  ['W A S D · Q E', 'fly the camera (⇧ fast, Ctrl slow)'],
+  ['Left-drag', 'orbit · Middle/⇧-drag pan · scroll zoom'],
   ['Click an object', 'select it (yellow box)'],
   ['Drag selected', 'move · ⇧ height · ⌥ rotate · ⌘/Ctrl scale'],
-  ['Esc / click empty', 'deselect'],
-  ['Left-drag', 'orbit the camera'],
-  ['Middle-drag / Shift+drag', 'pan'],
-  ['Scroll', 'zoom'],
+  ['[ ] · - =', 'rotate · scale the selection'],
+  ['F / Delete', 'frame / remove the selection'],
+  ['C', 'capture a frame (vision modes)'],
+  ['H · ?', 'toggle sidebar · this help'],
   ['Drag orange/pink handles', 'move the capture camera / its target'],
   ['Right-drag', 'erase splats (when the ✏ brush is on)'],
+  ['Esc / click empty', 'deselect'],
 ];
 
 /** Dismissable viewport-controls help; open state persists. */
@@ -24,6 +27,17 @@ function TipPill() {
     setOpen(next);
     localStorage.setItem(TIP_KEY, next ? '1' : '0');
   };
+
+  // '?' shortcut routes here.
+  useEffect(() => {
+    const onToggle = () =>
+      setOpen((o) => {
+        localStorage.setItem(TIP_KEY, o ? '0' : '1');
+        return !o;
+      });
+    window.addEventListener('sds:toggle-help', onToggle);
+    return () => window.removeEventListener('sds:toggle-help', onToggle);
+  }, []);
   if (!open) {
     return (
       <button

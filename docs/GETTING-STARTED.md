@@ -39,6 +39,15 @@ npm run dev   # http://localhost:5173
   Braccio arm (five trajectories, pick-and-place outcomes), POV camera captures,
   ROS 2 JSONL export.
 
+## Keyboard controls
+
+Fly the viewport camera with **W A S D** (+ **Q**/**E** down/up, arrow keys work
+too) — hold `⇧` for fast, `Ctrl` for slow. Left-drag still orbits, middle/⇧-drag
+pans, scroll zooms. With something selected: **[** / **]** rotate ∓15°, **-** /
+**=** scale, **F** frames it, **Delete** removes it. **C** captures a frame
+(vision modes), **H** toggles the sidebar, **?** toggles the in-app controls
+help. Shortcuts pause automatically while you type in a text field.
+
 ## Splat editing
 
 Enable ⛭ on a splat: move/rotate/scale, **right-drag erases** with a brush
