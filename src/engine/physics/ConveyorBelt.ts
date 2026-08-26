@@ -184,9 +184,11 @@ export class ConveyorBelt {
 
   private onUpdate(dt: number): void {
     if (!this.root.enabled || Math.abs(this.speed) < 1e-4) return;
-    // Stripe scroll locked to body speed: +Z flow = increasing offset.y,
-    // same convention as the original (box top-face V runs along -Z).
-    this.offsetY += beltTextureOffsetDelta(this.speed, dt, BELT_TEXTURE_REPEAT, BELT_LENGTH);
+    // Stripe scroll locked to body speed. PlayCanvas box top-face V runs
+    // along +Z (verified from the mesh's UVs), and a growing sampling
+    // offset moves the visible pattern toward -V — so ADVANCING the
+    // offset for +Z transport scrolls stripes backwards. Subtract.
+    this.offsetY -= beltTextureOffsetDelta(this.speed, dt, BELT_TEXTURE_REPEAT, BELT_LENGTH);
     // Keep the accumulator bounded; UVs wrap every 1.0 anyway.
     if (this.offsetY > 1e4 || this.offsetY < -1e4) this.offsetY %= 1;
     this.beltMaterial.diffuseMapOffset.set(0, this.offsetY);

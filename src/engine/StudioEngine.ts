@@ -405,30 +405,32 @@ export class StudioEngine {
         this.pickerDirty = false;
       }
       this.picker.getWorldPointAsync(x, y).then((worldPoint: Vec3 | null) => {
-        const current = this.eraseTarget;
-        // The entity may have been removed while the async pick resolved.
-        if (worldPoint && current && current.entity.gsplat) {
+        // Use the STROKE's target (captured at dispatch), not the live
+        // eraseTarget: picks resolve async, and re-reading would apply a
+        // stroke with whatever brush mode/color is current by then. Only
+        // liveness is re-checked — the entity may have been removed.
+        if (worldPoint && target.entity.gsplat) {
           // Ops live in the splat's LOCAL space so they are recordable,
           // replayable after reload, and bakeable into exports.
-          const world = current.entity.getWorldTransform();
+          const world = target.entity.getWorldTransform();
           const local = new Mat4().copy(world).invert().transformPoint(worldPoint);
           const worldScale = world.getScale().x || 1;
           const op: SplatEditOp =
-            current.mode === 'tint'
+            target.mode === 'tint'
               ? {
                   kind: 'tintSphere',
                   center: [local.x, local.y, local.z],
-                  radius: current.radius / worldScale,
-                  color: [...current.tintColor],
-                  strength: current.tintStrength,
+                  radius: target.radius / worldScale,
+                  color: [...target.tintColor],
+                  strength: target.tintStrength,
                 }
               : {
                   kind: 'eraseSphere',
                   center: [local.x, local.y, local.z],
-                  radius: current.radius / worldScale,
+                  radius: target.radius / worldScale,
                 };
-          this.splatEditor.applyOp(current.entity, op);
-          this.splats.recordEditOp(current.entity, op);
+          this.splatEditor.applyOp(target.entity, op);
+          this.splats.recordEditOp(target.entity, op);
           // A pick can resolve after mouseup (stroke already ended) —
           // snapshot immediately so the trailing op persists too.
           if (!this.erasing) this.splats.notifyEditsChanged();
