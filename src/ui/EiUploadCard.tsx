@@ -6,6 +6,8 @@ import {
   waitForEiJob,
 } from '../lib/edgeImpulse';
 import type { IngestionMetadataExtras } from '../lib/types';
+import { eiAuthSatisfied } from '../lib/eiAuth';
+import { URL_FLAGS } from '../lib/urlParams';
 import { CollapsibleCard } from './primitives';
 import './ei.css';
 
@@ -137,11 +139,14 @@ export function EiUploadCard() {
   };
 
   const boxesTotal = captures.reduce((acc, c) => acc + c.boxes.length, 0);
+  // `?bypassAuth=1` lifts the key gate so the flows can be demoed
+  // offline; the requests themselves still fail loudly without a key.
+  const authOk = eiAuthSatisfied(ei.apiKey, URL_FLAGS.bypassAuth);
 
   return (
     <CollapsibleCard heading="Upload to Edge Impulse">
       <div className="ei-stack">
-        {!ei.apiKey && (
+        {!authOk && (
           <p className="ei-note">
             Set your API key in the <strong>Edge Impulse · auth</strong> card.
           </p>
@@ -161,14 +166,14 @@ export function EiUploadCard() {
           className="primary"
           onClick={onUpload}
           disabled={
-            captures.length === 0 || !ei.apiKey || status.kind === 'busy'
+            captures.length === 0 || !authOk || status.kind === 'busy'
           }
         >
           ⤴ Upload {captures.length} images
         </button>
         <button
           onClick={onRetrainModel}
-          disabled={!ei.apiKey || status.kind === 'busy'}
+          disabled={!authOk || status.kind === 'busy'}
           title="Retrain the selected project's current impulse with the last known Studio settings."
         >
           ↻ Retrain model

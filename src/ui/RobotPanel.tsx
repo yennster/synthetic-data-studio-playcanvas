@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Vec3, type Entity } from 'playcanvas';
 import { useEngine } from '../engine/EngineContext';
 import {
@@ -280,14 +280,16 @@ export function RobotPanel() {
   const imuCount = useStore((s) => s.robotImuSamples.length);
   const lidarCount = useStore((s) => s.lidarSamples.length);
 
-  // Arm home pose lives in panel state: the shared store's RobotSettings
-  // has no armHomePose field and the store is outside this panel's
-  // write scope. The pose is handed to the runner per run and mirrored
-  // into the rig, so behavior matches the original contract minus
-  // persistence across reloads.
-  const [armHomePose, setArmHomePose] = useState<BraccioJointVector>(() => [
-    ...BRACCIO_REST_RAD,
-  ]);
+  // Arm home pose lives on the store's RobotSettings (persisted across
+  // reloads, and seeded by `?armPose=` via applyUrlPresets). The nullish
+  // fallback covers persisted snapshots from before the field existed.
+  // The pose is handed to the runner per run and mirrored into the rig.
+  const armHomePose: BraccioJointVector =
+    robot.armHomePose ?? BRACCIO_REST_RAD;
+  const setArmHomePose = useCallback(
+    (pose: BraccioJointVector) => setRobot({ armHomePose: [...pose] }),
+    [setRobot]
+  );
   const homePoseRef = useRef<BraccioJointVector>(armHomePose);
 
   const roverRigRef = useRef<RoverRig | null>(null);
@@ -593,7 +595,7 @@ export function RobotPanel() {
     roverRigRef.current?.setContact(false);
     armRigRef.current?.setJoints(BRACCIO_REST_RAD);
     setStatus('idle', '');
-  }, [clearObjects, clearRobotSamples, setStatus]);
+  }, [clearObjects, clearRobotSamples, setArmHomePose, setStatus]);
 
   const disabled = robotRunning;
   const imagesPerIteration = robot.captureAtRest

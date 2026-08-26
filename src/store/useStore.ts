@@ -27,6 +27,7 @@ function throttledLocalStorage(delayMs: number): Storage {
     },
   } as Storage;
 }
+import { BRACCIO_REST_RAD } from '../lib/braccio';
 import type { SplatEntry } from '../engine/splats/SplatManager';
 import type { SkyboxPreset } from '../engine/SkyboxManager';
 import type { ModelEntry } from '../engine/ModelManager';
@@ -216,6 +217,10 @@ export interface RobotSettings {
   objectDetectionWidth: number;
   objectDetectionHeight: number;
   objectDetectionImagesPerIteration: number;
+  /** Braccio idle/home pose (servo-radians ×5 + gripper aperture 0..1).
+   * Optional: persisted snapshots from before this field existed lack
+   * it — consumers fall back to BRACCIO_REST_RAD. */
+  armHomePose?: [number, number, number, number, number, number];
 }
 
 export const DEFAULT_ROBOT: RobotSettings = {
@@ -235,6 +240,7 @@ export const DEFAULT_ROBOT: RobotSettings = {
   objectDetectionWidth: 640,
   objectDetectionHeight: 480,
   objectDetectionImagesPerIteration: 1,
+  armHomePose: [...BRACCIO_REST_RAD],
 };
 
 export interface StatusState {

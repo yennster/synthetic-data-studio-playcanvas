@@ -325,3 +325,45 @@
   padding: 2px 8px;
   white-space: nowrap;
 }
+
+/* ---- Capture from real life (ObjectCaptureCard) ------------------- */
+
+.oc-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oc-stack a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.oc-stack a:hover {
+  text-decoration: underline;
+}
+
+.oc-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.oc-badge {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.oc-badge.ok {
+  color: var(--accent-2);
+}
+
+/* The dark-theme green is too pale on the light panel. */
+:root[data-theme='light'] .oc-badge.ok {
+  color: #1e8e5a;
+}

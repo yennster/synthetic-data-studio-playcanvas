@@ -33,8 +33,11 @@ Example:
 | `studioHost`, `ingestionHost` | host | EI host overrides (allowlisted: `*.edgeimpulse.com` HTTPS or loopback) |
 | `sampleRate` | 20..500 | Motion IMU sample rate |
 | `roverEvent` | `cruise` `collision` `stuck` | Rover event class |
+| `armPose` | 6 comma floats (servo radians ×5 + gripper 0..1) | Arm home pose (robot mode) |
 | `theme` | `dark` \| `light` | UI theme |
 | `embed=1` | flag | Strips ALL chrome (sidebar, HUD, prompts) |
+| `embedOrigin` | origin URL | Target origin for iframe `IFRAME_HEIGHT` pings (falls back to the referrer origin; no origin → no pings) |
+| `bypassAuth=1` | flag | Treats EI auth as satisfied for UI gating so upload/retrain flows can be demoed offline (requests still need a real key). Dead in the original; wired here |
 | `ui=minimal` | flag | Strips the sidebar |
 | `gizmos=0` | flag | Hides the camera/trajectory gizmos in the viewport |
 | `autoUpload=1` | flag | Uploads a finished batch to Edge Impulse automatically (needs `apiKey`) |
@@ -46,7 +49,5 @@ Example:
 |---|---|
 | `env` (`studio`/`warehouse`/`whitebox`/`outdoor`) | Env presets — this edition uses splat backdrops + `Sky` presets instead (TODO) |
 | `conveyor`, `conveyorSpeed` | Conveyor belt (physics phase, TODO.md) |
-| `armPose` | Arm home pose lives in panel state, not the store yet |
 | `eiProject` | Parse-only in the original as well |
 | `debug`, `perf`, `camLog` | Dev overlays (use `window.__studio` / `window.__useStore`) |
-| `bypassAuth` | Offline EI stubs |

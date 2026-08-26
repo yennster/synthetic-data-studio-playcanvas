@@ -18,6 +18,8 @@ import {
   type EiResult,
   type LoadedEiModel,
 } from '../lib/eiModel';
+import { eiAuthSatisfied } from '../lib/eiAuth';
+import { URL_FLAGS } from '../lib/urlParams';
 import { CollapsibleCard, SliderRow } from './primitives';
 import { InferenceOverlay } from './InferenceOverlay';
 import './ei.css';
@@ -497,10 +499,13 @@ export function EiInferenceCard({
             <button
               onClick={onListProjects}
               disabled={
-                modelLoading || !ei.apiKey || inferenceStatus.kind === 'busy'
+                modelLoading ||
+                // `?bypassAuth=1` lifts the key gate for offline UI demos.
+                !eiAuthSatisfied(ei.apiKey, URL_FLAGS.bypassAuth) ||
+                inferenceStatus.kind === 'busy'
               }
               title={
-                !ei.apiKey
+                !eiAuthSatisfied(ei.apiKey, URL_FLAGS.bypassAuth)
                   ? 'Set your API key in the Edge Impulse · auth card above'
                   : undefined
               }

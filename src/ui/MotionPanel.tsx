@@ -11,6 +11,8 @@ import {
   uploadSample,
   waitForEiJob,
 } from '../lib/edgeImpulse';
+import { eiAuthSatisfied } from '../lib/eiAuth';
+import { URL_FLAGS } from '../lib/urlParams';
 import { getRng } from '../lib/rng';
 import { createIdleSampler, runProceduralBatch } from '../modes/motionRunner';
 import {
@@ -259,6 +261,11 @@ export function MotionPanel() {
       ? (samples[samples.length - 1].t - samples[0].t) / 1000
       : samples.length / sampleRateHz;
   const hasApiKey = ei.apiKey.trim().length > 0;
+  // `?bypassAuth=1` lifts the key gate on the upload/retrain buttons so
+  // the flows can be demoed offline (handlers still fail loudly without
+  // a key). It deliberately does NOT flip `hasApiKey`: the Generate
+  // button's upload-vs-download behavior stays keyed to a real key.
+  const authOk = eiAuthSatisfied(ei.apiKey, URL_FLAGS.bypassAuth);
   const showHeightSliders =
     drops.motion === 'drop' || drops.motion === 'throw' || drops.motion === 'shake';
   const heightLabel = drops.motion === 'shake' ? 'Center height' : 'Drop height';
@@ -476,7 +483,7 @@ export function MotionPanel() {
       <EiAuthCard showHmac />
 
       <CollapsibleCard heading="Upload to Edge Impulse">
-        {!ei.apiKey && (
+        {!authOk && (
           <p className="motion-note">
             Set your API key in the <strong>Edge Impulse · auth</strong> card
             above.
@@ -489,7 +496,7 @@ export function MotionPanel() {
             disabled={
               isRecording ||
               samples.length === 0 ||
-              !ei.apiKey ||
+              !authOk ||
               status.kind === 'busy'
             }
           >
@@ -497,9 +504,9 @@ export function MotionPanel() {
           </button>
           <button
             onClick={onRetrainModel}
-            disabled={!ei.apiKey || status.kind === 'busy'}
+            disabled={!authOk || status.kind === 'busy'}
             title={
-              !ei.apiKey ? 'Set your API key in the auth card first' : undefined
+              !authOk ? 'Set your API key in the auth card first' : undefined
             }
           >
             ↻ Retrain model

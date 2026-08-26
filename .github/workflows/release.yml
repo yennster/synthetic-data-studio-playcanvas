@@ -1,0 +1,72 @@
+name: release
+
+# Triggered when a tag matching `v*` is pushed (e.g. `v0.3.0`).
+# Type-checks, tests, builds the static bundle, sanity-checks the dist
+# artifact, and attaches a tarball of it to a GitHub release.
+# (Unlike the original app there is no GitHub Packages publish — this
+# package is private and deploys via Vercel instead.)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to release (e.g. v0.3.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to attach files to the release.
+      contents: write
+    env:
+      # Resolved tag — comes from the dispatch input or the pushed tag ref.
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc -b
+
+      - name: Test
+        run: npx vitest run
+
+      - name: Build
+        run: npx vite build
+
+      - name: Sanity-check dist artifact
+        run: |
+          test -f dist/index.html
+          # Vite emits hashed bundles under dist/assets — require at least
+          # one JS chunk so an empty/partial build can't ship.
+          ls dist/assets/*.js >/dev/null
+          echo "dist bundle OK"
+
+      - name: Tar dist bundle
+        run: |
+          tar -czf "synthetic-data-studio-playcanvas-${RELEASE_TAG}.tar.gz" -C dist .
+          ls -lh "synthetic-data-studio-playcanvas-${RELEASE_TAG}.tar.gz"
+
+      - name: Create / update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: synthetic-data-studio-playcanvas-${{ env.RELEASE_TAG }}.tar.gz
+          generate_release_notes: true
+          fail_on_unmatched_files: true

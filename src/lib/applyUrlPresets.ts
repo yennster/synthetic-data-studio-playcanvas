@@ -55,6 +55,7 @@ export function applyUrlPresets(): void {
   if (p.eiCategory) store.setEi({ category: p.eiCategory });
   if (p.robotKind) store.setRobot({ kind: p.robotKind });
   if (p.roverEvent) store.setRobot({ roverEvent: p.roverEvent });
+  if (p.armPose) store.setRobot({ armHomePose: p.armPose });
   if (p.sampleRate !== undefined) store.setSampleRateHz(p.sampleRate);
 
   const capturePatch: Partial<import('../store/useStore').CaptureSettings> = {};

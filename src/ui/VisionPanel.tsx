@@ -15,6 +15,7 @@ import {
   ToggleSwitch,
 } from './primitives';
 import { SceneObjectsCard } from './SceneObjectsCard';
+import { ObjectCaptureCard } from './ObjectCaptureCard';
 import { RealismCard } from './RealismCard';
 import { EiAuthCard } from './EiAuthCard';
 import { EiInferenceCard } from './EiInferenceCard';
@@ -24,8 +25,8 @@ import './vision.css';
 
 /**
  * Sidebar panel shared by the detection and anomaly modes: Scene,
- * Objects, Virtual camera, Realism, Capture, then the Edge Impulse
- * cards. The engine mirrors store state (scene objects via the shell's
+ * Objects, Capture-from-real-life docs, Virtual camera, Realism,
+ * Capture, then the Edge Impulse cards. The engine mirrors store state (scene objects via the shell's
  * subscription, capture camera via useCaptureCameraSync) — this panel
  * only reads/writes the store plus a few direct environment setters.
  */
@@ -34,6 +35,7 @@ export function VisionPanel() {
     <>
       <SceneCard />
       <SceneObjectsCard ownerFilter="vision" />
+      <ObjectCaptureCard />
       <VirtualCameraCard />
       <RealismCard />
       <CaptureCard />
