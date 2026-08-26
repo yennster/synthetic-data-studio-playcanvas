@@ -30,6 +30,8 @@ import { GizmoRenderer } from './GizmoRenderer';
 import { sampleCameraTrajectory } from '../lib/cameraTrajectory';
 import { SelectionController } from './SelectionController';
 import { CaptureRig } from './capture/CaptureRig';
+import { PhysicsWorld } from './physics/PhysicsWorld';
+import { ConveyorBelt } from './physics/ConveyorBelt';
 import type { LabelTarget } from './capture/projectBoxes';
 
 /**
@@ -46,6 +48,10 @@ export class StudioEngine {
   splats: SplatManager;
   models: ModelManager;
   objects: ObjectManager;
+  /** Lazy Rapier world for spawned primitives (loads on first need). */
+  physics: PhysicsWorld;
+  /** Conveyor-belt visuals; colliders/transport live in `physics`. */
+  conveyor: ConveyorBelt;
   capture: CaptureRig;
   splatEditor: SplatEditor;
   skybox: SkyboxManager;
@@ -81,6 +87,10 @@ export class StudioEngine {
     this.splats = new SplatManager(app, this.content);
     this.models = new ModelManager(app, this.content);
     this.objects = new ObjectManager(app, this.content);
+    this.physics = new PhysicsWorld(app, (id) => this.objects.getEntity(id));
+    // While a body exists for an object, the physics world owns its pose.
+    this.objects.externallyPosed = (id) => this.physics.isTracking(id);
+    this.conveyor = new ConveyorBelt(app, this.content);
     this.capture = new CaptureRig(app);
     this.splatEditor = new SplatEditor(app);
     this.skybox = new SkyboxManager(app);
@@ -492,6 +502,8 @@ export class StudioEngine {
     this.skybox.destroy();
     this.splatEditor.destroy();
     this.capture.destroy();
+    this.conveyor.destroy();
+    this.physics.destroy();
     this.objects.destroy();
     this.models.destroy();
     this.splats.destroy();

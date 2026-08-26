@@ -58,6 +58,8 @@ export function applyUrlPresets(): void {
   if (p.roverEvent) store.setRobot({ roverEvent: p.roverEvent });
   if (p.armPose) store.setRobot({ armHomePose: p.armPose });
   if (p.sampleRate !== undefined) store.setSampleRateHz(p.sampleRate);
+  if (p.conveyor !== undefined) store.setShowConveyor(p.conveyor);
+  if (p.conveyorSpeed !== undefined) store.setConveyorSpeed(p.conveyorSpeed);
 
   const capturePatch: Partial<import('../store/useStore').CaptureSettings> = {};
   if (p.batchCount !== undefined) capturePatch.batchCount = p.batchCount;

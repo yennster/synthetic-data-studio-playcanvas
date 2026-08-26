@@ -304,6 +304,10 @@ interface StudioState {
   /** Custom floor/wall texture metadata; the bytes live in IndexedDB. */
   customFloorTexture: CustomTextureMeta | null;
   customWallTexture: CustomTextureMeta | null;
+  /** Conveyor belt visible + simulated (Scene card toggle). */
+  showConveyor: boolean;
+  /** Belt transport speed, m/s along +Z (−2..2, original default 0.5). */
+  conveyorSpeed: number;
   /** Width of the virtual-camera / POV preview overlay, CSS px. */
   pipWidth: number;
 
@@ -344,6 +348,8 @@ interface StudioState {
   setEnvPreset(preset: EnvironmentPreset): void;
   setCustomFloorTexture(meta: CustomTextureMeta | null): void;
   setCustomWallTexture(meta: CustomTextureMeta | null): void;
+  setShowConveyor(show: boolean): void;
+  setConveyorSpeed(speed: number): void;
   setPipWidth(width: number): void;
   setSplats(entries: SplatEntry[]): void;
   setModels(entries: ModelEntry[]): void;
@@ -421,6 +427,8 @@ export const useStore = create<StudioState>()(
       envPreset: 'none',
       customFloorTexture: null,
       customWallTexture: null,
+      showConveyor: false,
+      conveyorSpeed: 0.5,
       pipWidth: 240,
 
       splats: [],
@@ -471,6 +479,8 @@ export const useStore = create<StudioState>()(
       setEnvPreset: (envPreset) => set({ envPreset }),
       setCustomFloorTexture: (customFloorTexture) => set({ customFloorTexture }),
       setCustomWallTexture: (customWallTexture) => set({ customWallTexture }),
+      setShowConveyor: (showConveyor) => set({ showConveyor }),
+      setConveyorSpeed: (conveyorSpeed) => set({ conveyorSpeed }),
       setPipWidth: (pipWidth) =>
         set({ pipWidth: Math.min(640, Math.max(140, Math.round(pipWidth))) }),
       setSplats: (splats) => set({ splats }),
@@ -547,6 +557,8 @@ export const useStore = create<StudioState>()(
         envPreset: s.envPreset,
         customFloorTexture: s.customFloorTexture,
         customWallTexture: s.customWallTexture,
+        showConveyor: s.showConveyor,
+        conveyorSpeed: s.conveyorSpeed,
         pipWidth: s.pipWidth,
         cardOpen: s.cardOpen,
         sceneObjects: s.sceneObjects,

@@ -54,11 +54,39 @@ export function EngineProvider({ children }: { children: ReactNode }) {
           snapshotPendingAssets(created);
         });
         void rehydrateAssets(created);
-        // Mirror store scene objects into engine entities.
+        // A body falling asleep persists its settled pose (mm-rounded,
+        // same convention as routeSelectionTransform). PhysicsWorld's
+        // lastPos/lastYaw watermark recognizes the resulting store echo
+        // so it never teleports the body it came from.
+        created.physics.onSettled = (id, pose) => {
+          const s = useStore.getState();
+          if (!s.sceneObjects.some((o) => o.id === id)) return;
+          s.updateObject(id, { position: pose.position, rotation: pose.rotation });
+        };
+        // Mirror store scene objects into engine entities (+ physics bodies),
+        // and the conveyor toggle/speed into belt visuals + colliders.
+        const syncBelt = (show: boolean, speed: number) => {
+          created.conveyor.setActive(show);
+          created.conveyor.setSpeed(speed);
+          created.physics.setBelt(show, speed);
+        };
+        // Physics first: body creation/removal must settle before
+        // objects.sync asks isTracking() to decide pose ownership (a
+        // physics→off toggle otherwise leaves the entity stale for a
+        // frame at the removed body's last pose).
+        created.physics.syncObjects(useStore.getState().sceneObjects);
         created.objects.sync(useStore.getState().sceneObjects);
+        syncBelt(useStore.getState().showConveyor, useStore.getState().conveyorSpeed);
         const unsubObjects = useStore.subscribe((state, prev) => {
           if (state.sceneObjects !== prev.sceneObjects) {
+            created.physics.syncObjects(state.sceneObjects);
             created.objects.sync(state.sceneObjects);
+          }
+          if (
+            state.showConveyor !== prev.showConveyor ||
+            state.conveyorSpeed !== prev.conveyorSpeed
+          ) {
+            syncBelt(state.showConveyor, state.conveyorSpeed);
           }
         });
         created.app.on('destroy', unsubObjects);

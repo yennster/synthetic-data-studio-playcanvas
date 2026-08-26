@@ -70,6 +70,10 @@ function SceneCard() {
   const engine = useEngine();
   const lightIntensity = useStore((s) => s.capture.lightIntensity);
   const setCapture = useStore((s) => s.setCapture);
+  const showConveyor = useStore((s) => s.showConveyor);
+  const setShowConveyor = useStore((s) => s.setShowConveyor);
+  const conveyorSpeed = useStore((s) => s.conveyorSpeed);
+  const setConveyorSpeed = useStore((s) => s.setConveyorSpeed);
 
   // Light-rig knobs are engine-side (not persisted): a viewing aid, not
   // captured dataset state. The environment preset + custom textures ARE
@@ -227,6 +231,27 @@ function SceneCard() {
           hint="Key light heading angle."
           onChange={setLightYaw}
         />
+        <ToggleSwitch
+          title="Conveyor belt"
+          help={
+            showConveyor
+              ? 'Spawned objects ride the belt — adjust speed below.'
+              : 'No belt — objects fall onto the floor at spawn position.'
+          }
+          on={showConveyor}
+          onChange={setShowConveyor}
+        />
+        {showConveyor && (
+          <SliderRow
+            label="Belt speed"
+            value={conveyorSpeed}
+            min={-2}
+            max={2}
+            step={0.05}
+            formatValue={(v) => `${v.toFixed(2)} m/s`}
+            onChange={setConveyorSpeed}
+          />
+        )}
         <p className="vision-note">
           Scene presets restyle the ground and sky together; sky-only
           presets leave the ground theme-colored. For photoreal backdrops,

@@ -300,7 +300,7 @@ function SceneObjectRow({
           onChange={(e) => onUpdate({ physics: e.target.checked })}
           disabled={disabled}
         />
-        <span>Physics (rests on the ground)</span>
+        <span>Physics (falls, collides)</span>
       </label>
     </div>
   );

@@ -16,6 +16,11 @@ import { buildBoundingBoxLabelsFile, makeFilename, saveBlob } from '../lib/captu
 import { buildZipOffThread } from '../lib/zipWorkerClient';
 import type { ZipEntry } from '../lib/zip';
 import { getRng } from '../lib/rng';
+import {
+  jitterDropPosition,
+  sampleBeltDropPosition,
+  sampleDropRotation,
+} from '../lib/physicsSpec';
 import type { Capture } from '../lib/types';
 
 /** Snapshot of settings a batch run must restore afterwards. */
@@ -77,28 +82,51 @@ function applyLighting(engine: StudioEngine, base: BaseSnapshot): number {
 }
 
 /**
- * Jitters object positions around their BASE (batch-start) placement.
- * Reading current positions instead would compound the jitter every
- * iteration and random-walk objects out of frame by the end of a batch.
+ * Per-shot object randomization (original §4.3). Two paths:
+ *
+ * - Physics objects (physics=true, Rapier world ready): teleport into the
+ *   drop volume — above the belt when the conveyor is on, else a jitter
+ *   around the BASE (batch-start) placement — give them a full-sphere
+ *   drop orientation, then step the physics world synchronously until
+ *   every body settles (speed < 0.15 m/s; belt mode also requires
+ *   on-belt-or-fallen) or 2500 ms of *simulated* time passes. Sim-time
+ *   stepping keeps batches deterministic under `?seed=` and working in
+ *   hidden tabs where rAF/timers are throttled.
+ * - Physics-off objects (or Rapier unavailable): kinematic re-scatter —
+ *   the same base jitter, yaw only, no settling.
+ *
+ * Jittering around the base rather than current positions avoids
+ * compounding into a random walk out of frame over the batch.
  */
 function randomizeObjectPositions(
+  engine: StudioEngine,
   baseObjects: { id: string; position: [number, number, number]; rotation: number }[]
 ): void {
   const s = useStore.getState();
   if (!s.capture.randomizeObjects) return;
   const rng = getRng();
+  const belt = s.showConveyor;
+  let dropped = false;
   for (const base of baseObjects) {
     const obj = s.sceneObjects.find((o) => o.id === base.id);
     if (!obj || obj.owner) continue;
-    s.updateObject(base.id, {
-      position: [
-        base.position[0] + (rng() - 0.5) * 0.6,
-        Math.max(0.2, base.position[1] + (rng() - 0.5) * 0.2),
-        base.position[2] + (rng() - 0.5) * 0.6,
-      ],
-      rotation: rng() * Math.PI * 2,
-    });
+    if (obj.physics && engine.physics.isReady()) {
+      const position = belt
+        ? sampleBeltDropPosition(rng)
+        : jitterDropPosition(rng, base.position);
+      const euler = sampleDropRotation(rng);
+      // The store keeps yaw only; the body gets the full drop orientation.
+      s.updateObject(base.id, { position, rotation: euler[1] });
+      engine.physics.applyDropRotation(base.id, euler);
+      dropped = true;
+    } else {
+      s.updateObject(base.id, {
+        position: jitterDropPosition(rng, base.position),
+        rotation: rng() * Math.PI * 2,
+      });
+    }
   }
+  if (dropped) engine.physics.settleSync({ belt });
 }
 
 /** Object kinds present in the scene at capture time (deduped). */
@@ -235,6 +263,16 @@ export async function runBatch(
     rotation: o.rotation,
   }));
 
+  // Real physics settling needs the Rapier world; load it up front so the
+  // first iterations don't silently fall back to the kinematic path. If
+  // loading failed, isReady() stays false and the fallback applies.
+  if (
+    s.capture.randomizeObjects &&
+    s.sceneObjects.some((o) => !o.owner && o.physics)
+  ) {
+    await engine.physics.ensureLoaded();
+  }
+
   const captured: Capture[] = [];
   try {
     for (let i = 0; i < total; i++) {
@@ -243,7 +281,7 @@ export async function runBatch(
       // Preview camera follows so the PiP shows the shot being framed.
       engine.setCaptureCameraPose(pose.pos, pose.target, pose.fov);
       applyLighting(engine, base);
-      randomizeObjectPositions(baseObjects);
+      randomizeObjectPositions(engine, baseObjects);
       const capture = await captureOne(engine, prefix, pose);
       useStore.getState().addCapture(capture);
       captured.push(capture);

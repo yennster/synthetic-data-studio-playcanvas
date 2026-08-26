@@ -36,11 +36,21 @@ interface Managed {
 
 /**
  * Mirrors the store's sceneObjects into PlayCanvas entities. Objects with
- * physics=true rest on the ground plane (instant settle — a real physics
- * integration is tracked in TODO.md Phase 5); physics=false honors the
- * stored Y position exactly.
+ * physics=true are normally pose-driven by the Rapier PhysicsWorld (see
+ * `externallyPosed`); until that world is ready they rest on the ground
+ * plane (instant settle fallback). physics=false honors the stored Y
+ * position exactly.
  */
 export class ObjectManager {
+  /**
+   * When set, objects for which this returns true have their entity pose
+   * driven externally (the Rapier PhysicsWorld writes body poses every
+   * frame) — sync() then skips its own position/rotation writes for them
+   * so a store echo can't snap a simulated body back for a frame. Scale
+   * and material updates still apply.
+   */
+  externallyPosed: ((id: string) => boolean) | null = null;
+
   private app: AppBase;
   private parent: Entity;
   private managed = new Map<string, Managed>();
@@ -95,10 +105,15 @@ export class ObjectManager {
       m.material.useMetalness = true;
       m.material.update();
     }
-    const restY = (cfg.height * obj.scale) / 2;
-    const y = obj.physics ? restY : obj.position[1];
-    m.entity.setLocalPosition(obj.position[0], y, obj.position[2]);
-    m.entity.setLocalEulerAngles(0, (obj.rotation * 180) / Math.PI, 0);
+    if (!this.externallyPosed?.(obj.id)) {
+      // Not physics-driven: instant ground-rest for physics=true (the
+      // pre-Rapier fallback while the wasm loads / if it failed), exact
+      // stored Y for physics=false.
+      const restY = (cfg.height * obj.scale) / 2;
+      const y = obj.physics ? restY : obj.position[1];
+      m.entity.setLocalPosition(obj.position[0], y, obj.position[2]);
+      m.entity.setLocalEulerAngles(0, (obj.rotation * 180) / Math.PI, 0);
+    }
     m.entity.setLocalScale(
       cfg.scale[0] * obj.scale,
       cfg.scale[1] * obj.scale,
@@ -133,6 +148,11 @@ export class ObjectManager {
       targets.push({ label: m.obj.label, aabbs: [aabb] });
     }
     return targets;
+  }
+
+  /** Entity for a managed object id (PhysicsWorld body↔entity sync). */
+  getEntity(id: string): Entity | null {
+    return this.managed.get(id)?.entity ?? null;
   }
 
   /** Selectable entries for viewport click-manipulation. */
