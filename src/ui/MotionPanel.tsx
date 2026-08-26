@@ -4,6 +4,8 @@ import {
   type MotionClass,
   type ObjectKind,
 } from '../store/useStore';
+import { useEngine } from '../engine/EngineContext';
+import type { HandSession } from '../modes/handTracking';
 import {
   buildFileName,
   listEiProjects,
@@ -74,12 +76,29 @@ const explainEiError = (e: unknown): string => {
   return msg;
 };
 
+/** Coarse hand-tracking status for the webcam card's status line. */
+type HandStatus =
+  | { kind: 'off' }
+  | { kind: 'init' }
+  | { kind: 'tracking' }
+  | { kind: 'nohand' }
+  | { kind: 'error'; message: string };
+
+const HAND_STATUS_TEXT: Record<Exclude<HandStatus['kind'], 'error'>, string> = {
+  off: '',
+  init: 'Starting camera…',
+  tracking: 'Tracking — pinch to grab',
+  nohand: 'No hand detected',
+};
+
 /**
  * Motion mode sidebar: Object, Recording, Procedural motions, EI auth,
- * and Upload cards. Hand tracking is not ported yet (MediaPipe), so the
- * webcam toggle renders disabled and manual recording synthesizes a
- * live near-still 'idle' trace through the IMU-noise pipeline — the
- * full record → upload path stays exercisable end to end.
+ * and Upload cards. The webcam toggle lazy-loads MediaPipe hand
+ * tracking (§6.3): pinch grabs the manipulated body in the scene, and
+ * while tracking is live, manual recording differentiates the driven
+ * pose into IMU samples instead of the near-still 'idle' fallback —
+ * either way the record → upload path is the same end to end. Webcam
+ * frames never leave the browser (§7.11).
  */
 export function MotionPanel() {
   // Per-key selectors so the panel only re-renders for fields it reads
@@ -99,21 +118,94 @@ export function MotionPanel() {
   const dropsRunning = useStore((s) => s.dropsRunning);
   const setDropsRunning = useStore((s) => s.setDropsRunning);
 
-  // The rebuilt store has no objectKind slice (the motion body isn't in
-  // the scene yet) — the selection only feeds the `shape` metadata.
+  // The rebuilt store has no objectKind slice — the selection feeds the
+  // `shape` metadata and the hand-driven body's primitive.
   const [objectKind, setObjectKind] = useState<ObjectKind>('cube');
 
   // Stop-button flag for the procedural runner, polled between
   // iterations (the store has no dropsCancelRequested field).
   const cancelRef = useRef(false);
 
-  // Live 'idle' sampler: while recording, synthesize near-still noisy
-  // samples at the configured rate so users can exercise the full
-  // record → upload path without hand tracking.
+  // ---- Webcam hand tracking (lazy MediaPipe session) ----
+  const engine = useEngine();
+  const [webcamOn, setWebcamOn] = useState(false);
+  const [handStatus, setHandStatus] = useState<HandStatus>({ kind: 'off' });
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const camCanvasRef = useRef<HTMLCanvasElement>(null);
+  const sessionRef = useRef<HandSession | null>(null);
+  // Kind at session-start time without making the effect re-run on it
+  // (kind changes hot-swap via setKind below instead).
+  const kindRef = useRef(objectKind);
+  kindRef.current = objectKind;
+
+  // Session lifecycle: one effect covers toggle-off, mode switch, and
+  // unmount uniformly through its cleanup. Failures (permission denied,
+  // no camera, model fetch blocked) surface in the status line and
+  // revert the toggle — never crash.
+  useEffect(() => {
+    if (!webcamOn || !engine) return;
+    let cancelled = false;
+    let session: HandSession | null = null;
+    setHandStatus({ kind: 'init' });
+    (async () => {
+      try {
+        // Dynamic import keeps MediaPipe + webcam plumbing out of the
+        // initial bundle; the module itself lazy-loads tasks-vision.
+        const mod = await import('../modes/handTracking');
+        const video = videoRef.current;
+        const canvas = camCanvasRef.current;
+        if (!video || !canvas) throw new Error('Camera preview not ready');
+        session = await mod.startHandSession({
+          engine,
+          video,
+          canvas,
+          kind: kindRef.current,
+          rng: getRng(),
+          onHandState: (s) => {
+            if (!cancelled) {
+              setHandStatus({ kind: s.detected ? 'tracking' : 'nohand' });
+            }
+          },
+        });
+        if (cancelled) {
+          session.stop();
+          return;
+        }
+        sessionRef.current = session;
+        // Landmarker ready; report 'no hand' until the first detection.
+        setHandStatus({ kind: 'nohand' });
+      } catch (e) {
+        session?.stop();
+        if (!cancelled) {
+          setHandStatus({ kind: 'error', message: (e as Error).message });
+          setWebcamOn(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      sessionRef.current = null;
+      session?.stop();
+      // Keep an error visible after the auto-revert; otherwise go dark.
+      setHandStatus((s) => (s.kind === 'error' ? s : { kind: 'off' }));
+    };
+  }, [webcamOn, engine]);
+
+  // Hot-swap the driven body's shape with the Object selector.
+  useEffect(() => {
+    sessionRef.current?.setKind(objectKind);
+  }, [objectKind]);
+
+  // Live sampler: while recording, pull samples at the configured rate —
+  // from the hand-driven body's differentiated pose when tracking is
+  // live, else a synthesized near-still 'idle' trace. Both run through
+  // the same IMU-noise pipeline, so record → upload is identical.
   useEffect(() => {
     if (!isRecording) return;
     const st = useStore.getState();
-    const sampler = createIdleSampler(st.imuNoise, getRng());
+    const sampler = sessionRef.current
+      ? sessionRef.current.makeSampler(st.imuNoise)
+      : createIdleSampler(st.imuNoise, getRng());
     let last = performance.now();
     const id = window.setInterval(
       () => {
@@ -136,7 +228,8 @@ export function MotionPanel() {
       Math.max(4, Math.round(1000 / st.sampleRateHz))
     );
     return () => window.clearInterval(id);
-  }, [isRecording]);
+    // webcamOn: toggling tracking mid-recording swaps the sample source.
+  }, [isRecording, webcamOn]);
 
   const onRecord = () => {
     clearSamples();
@@ -155,7 +248,7 @@ export function MotionPanel() {
           mode: 'motion',
           shape: objectKind,
           sample_rate_hz: sampleRateHz,
-          hand_tracking: false,
+          hand_tracking: webcamOn,
         }
       );
       if (res.ok) {
@@ -286,15 +379,36 @@ export function MotionPanel() {
             ))}
           </select>
         </label>
-        <div title="Hand tracking arrives with the MediaPipe port — see TODO.md">
-          <ToggleSwitch
-            title="Webcam control"
-            on={false}
-            disabled
-            onChange={() => {}}
-            help="Camera stays off; procedural drops still work."
-          />
-        </div>
+        <ToggleSwitch
+          title="Webcam control"
+          on={webcamOn}
+          disabled={dropsRunning || !engine}
+          onChange={(on) => {
+            if (on) setHandStatus({ kind: 'init' });
+            setWebcamOn(on);
+          }}
+          help={
+            webcamOn
+              ? 'Use hand tracking to pinch, grab, and throw. Frames never leave your browser.'
+              : 'Camera stays off; procedural drops still work.'
+          }
+        />
+        {webcamOn && (
+          <div className="motion-cam" aria-label="Webcam hand tracking preview">
+            <video ref={videoRef} muted playsInline />
+            <canvas ref={camCanvasRef} />
+            {handStatus.kind !== 'off' && handStatus.kind !== 'error' && (
+              <span className={`motion-cam-status motion-cam-status--${handStatus.kind}`}>
+                {HAND_STATUS_TEXT[handStatus.kind]}
+              </span>
+            )}
+          </div>
+        )}
+        {handStatus.kind === 'error' && (
+          <p className="motion-note motion-cam-error" role="alert">
+            Hand tracking failed: {handStatus.message}
+          </p>
+        )}
         <p className="motion-note">
           IMU samples are 6-channel: accelerometer (m/s²) + gyroscope (rad/s).
         </p>

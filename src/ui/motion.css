@@ -79,3 +79,56 @@
   width: 100%;
   margin-top: 10px;
 }
+
+/* ------------------------------------------------------------------ *
+ * Webcam hand-tracking preview (Object card). The video + landmark    *
+ * canvas are CSS-mirrored together so on-screen hands move naturally; *
+ * the overlay is drawn in raw video pixel coords and stays aligned.   *
+ * ------------------------------------------------------------------ */
+
+.motion-cam {
+  position: relative;
+  margin-top: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+  /* Camera content is dark regardless of theme; paint the letterbox
+   * to match instead of flashing the panel color while loading. */
+  background: #000;
+  min-height: 60px;
+}
+
+.motion-cam video,
+.motion-cam canvas {
+  display: block;
+  width: 100%;
+  transform: scaleX(-1); /* mirror for natural interaction */
+}
+
+.motion-cam canvas {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+
+.motion-cam-status {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.6;
+  /* Chip sits on video pixels, not the panel — fixed dark styling
+   * reads correctly in both light and dark themes. */
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.motion-cam-status--tracking {
+  color: #5eead4; /* matches the pinch-ready skeleton stroke */
+}
+
+.motion-cam-error {
+  color: var(--error);
+}

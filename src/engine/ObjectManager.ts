@@ -15,7 +15,7 @@ import type { LabelTarget } from './capture/projectBoxes';
  * PlayCanvas units: box 1^3, sphere d=1, capsule r0.5 h2, cylinder r0.5 h1,
  * torus ring 0.3 tube 0.2 (outer d=1, height 0.4).
  */
-const KIND_CONFIG: Record<
+export const KIND_CONFIG: Record<
   ObjectKind,
   { type: string; scale: [number, number, number]; height: number }
 > = {
